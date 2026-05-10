@@ -320,16 +320,16 @@ def org_ship_edit(state: EditorState) -> None:
             while True:
                 print()
                 print("0) 저장하고 나간다")
-                print(f"1) 최대 회전력 : {ship4.lrudder}")
-                print(f"2) 최대 돛     : {ship4.lsail}")
-                print(f"3) 최대 승무원 : {ship4.lcrew * 10}")
-                print(f"4) 필요 승무원 : {ship4.dcrew}")
-                print(f"5) 최대 적재량 : {ship4.capacity}")
-                print(f"6) 최대 무기수 : {ship4.lnowea}")
-                print(f"7) 배이름      : {decode_kr(ship5.name)}")
+                print(f"1) 배이름      : {decode_kr(ship5.name)}")
+                print(f"2) 추진력      : {ship4.lsail}")
+                print(f"3) 선회력      : {ship4.lrudder}")
                 lhull_val = _read_lhull_rom(state, sel)
                 lhull_disp = str(lhull_val) if lhull_val is not None else "(MAIN.EXE 미발견)"
-                print(f"8) 신조 시 최대 내구도 : {lhull_disp}  [MAIN.EXE - 추정 위치]")
+                print(f"4) 최대 내구도 : {lhull_disp}  [MAIN.EXE - 추정 위치]")
+                print(f"5) 최대 적재량 : {ship4.capacity}")
+                print(f"6) 최대 승무원 : {ship4.lcrew * 10}")
+                print(f"7) 필요 승무원 : {ship4.dcrew}")
+                print(f"8) 최대 무기수 : {ship4.lnowea}")
                 print()
                 i = _read_int("고치기를 원하시는 데이터의 번호를 넣어 주세요 => ")
                 if 0 <= i <= 8:
@@ -338,16 +338,16 @@ def org_ship_edit(state: EditorState) -> None:
                 break
 
             if i == 1:
-                imsi = _read_int("최대 회전력을 고칩니다. => ")
-                ship4.lrudder = imsi & 0xFF
-                for k in range(state.ship_num):
-                    state.load(k)
-                    if state.ship3.ship_select == sel:
-                        if state.ship1.crudder > ship4.lrudder:
-                            state.ship1.crudder = ship4.lrudder
-                            state.store()
+                # 배이름 (Ship5.name) — 즉시 fwrite
+                new_name = _read_line("배의 이름을 고칩니다. => ")
+                ship5.name = encode_kr_fixed(new_name, 18)
+                state.fp.seek(s_addr + state.page + Ship5.SIZE * sel)
+                state.fp.write(ship5.to_bytes())
+                state.fp.flush()
+                state.ship_name[sel] = decode_kr(ship5.name)
             elif i == 2:
-                imsi = _read_int("최대 돛을 고칩니다. => ")
+                # 추진력 (Ship4.lsail)
+                imsi = _read_int("추진력을 고칩니다. => ")
                 ship4.lsail = imsi & 0xFF
                 for k in range(state.ship_num):
                     state.load(k)
@@ -356,6 +356,42 @@ def org_ship_edit(state: EditorState) -> None:
                             state.ship1.csail = ship4.lsail
                             state.store()
             elif i == 3:
+                # 선회력 (Ship4.lrudder)
+                imsi = _read_int("선회력을 고칩니다. => ")
+                ship4.lrudder = imsi & 0xFF
+                for k in range(state.ship_num):
+                    state.load(k)
+                    if state.ship3.ship_select == sel:
+                        if state.ship1.crudder > ship4.lrudder:
+                            state.ship1.crudder = ship4.lrudder
+                            state.store()
+            elif i == 4:
+                # 최대 내구도 (MAIN.EXE 의 lhull 테이블 — 추정 위치)
+                p = _mainexe_path(state)
+                if p is None:
+                    print("MAIN.EXE 를 찾지 못했습니다. (게임 폴더에서 실행해 주세요)")
+                    continue
+                print()
+                print("[경고] 이 항목은 추정 위치(MAIN.EXE 0x424AE)에 직접 씁니다.")
+                print("       게임 실험으로 검증되지 않았으므로, 이상 동작 시 MAIN.EXE.bak 으로 복구하세요.")
+                imsi = _read_int("신조 시 최대 내구도를 고칩니다 (0..65535). => ")
+                if not _write_lhull_rom(state, sel, imsi):
+                    print(f"MAIN.EXE 쓰기 실패: {p}")
+                else:
+                    print(f"저장됨: MAIN.EXE @ 0x{MAINEXE_LHULL_TABLE + sel * 2:05X} = {imsi & 0xFFFF}")
+            elif i == 5:
+                # 최대 적재량 (Ship4.capacity)
+                imsi = _read_int("최대 적재량을 고칩니다. => ")
+                ship4.capacity = imsi & 0xFFFF
+                for k in range(state.ship_num):
+                    state.load(k)
+                    if state.ship3.ship_select == sel:
+                        state.ship3.cargo = (
+                            ship4.capacity - state.ship3.f_weap - state.ship3.f_crew
+                        ) & 0xFFFF
+                        state.store()
+            elif i == 6:
+                # 최대 승무원 (Ship4.lcrew, 입력은 *10 단위)
                 imsi = _read_int("최대 승무원을 고칩니다. => ")
                 ship4.lcrew = (imsi // 10) & 0xFF
                 for k in range(state.ship_num):
@@ -369,20 +405,12 @@ def org_ship_edit(state: EditorState) -> None:
                                 ship4.capacity - state.ship3.f_weap - state.ship3.f_crew
                             ) & 0xFFFF
                             state.store()
-            elif i == 4:
+            elif i == 7:
+                # 필요 승무원 (Ship4.dcrew) — 클램프 체인 없음
                 imsi = _read_int("필요 승무원을 고칩니다. => ")
                 ship4.dcrew = imsi & 0xFF
-            elif i == 5:
-                imsi = _read_int("최대 적재량을 고칩니다. => ")
-                ship4.capacity = imsi & 0xFFFF
-                for k in range(state.ship_num):
-                    state.load(k)
-                    if state.ship3.ship_select == sel:
-                        state.ship3.cargo = (
-                            ship4.capacity - state.ship3.f_weap - state.ship3.f_crew
-                        ) & 0xFFFF
-                        state.store()
-            elif i == 6:
+            elif i == 8:
+                # 최대 무기수 (Ship4.lnowea)
                 imsi = _read_int("최대 무기수를 고칩니다. => ")
                 ship4.lnowea = imsi & 0xFF
                 for k in range(state.ship_num):
@@ -396,28 +424,6 @@ def org_ship_edit(state: EditorState) -> None:
                                 ship4.capacity - state.ship3.f_weap - state.ship3.f_crew
                             ) & 0xFFFF
                             state.store()
-            elif i == 7:
-                new_name = _read_line("배의 이름을 고칩니다. => ")
-                ship5.name = encode_kr_fixed(new_name, 18)
-                state.fp.seek(s_addr + state.page + Ship5.SIZE * sel)
-                state.fp.write(ship5.to_bytes())
-                state.fp.flush()
-                state.ship_name[sel] = decode_kr(ship5.name)
-            elif i == 8:
-                # MAIN.EXE 의 lhull 테이블 (추정 위치) 직접 편집.
-                # KOUKAI2.DAT 슬롯이 아닌 게임 실행 데이터를 건드리므로 주의.
-                p = _mainexe_path(state)
-                if p is None:
-                    print("MAIN.EXE 를 찾지 못했습니다. (게임 폴더에서 실행해 주세요)")
-                    continue
-                print()
-                print("[경고] 이 항목은 추정 위치(MAIN.EXE 0x424AE)에 직접 씁니다.")
-                print("       게임 실험으로 검증되지 않았으므로, 이상 동작 시 MAIN.EXE.bak 으로 복구하세요.")
-                imsi = _read_int("신조 시 최대 내구도를 고칩니다 (0..65535). => ")
-                if not _write_lhull_rom(state, sel, imsi):
-                    print(f"MAIN.EXE 쓰기 실패: {p}")
-                else:
-                    print(f"저장됨: MAIN.EXE @ 0x{MAINEXE_LHULL_TABLE + sel * 2:05X} = {imsi & 0xFFFF}")
 
         # 0 입력 시 Ship4 만 fwrite (Ship5 는 case 7 에서 처리됨).
         state.fp.seek(offset4)
