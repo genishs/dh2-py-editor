@@ -18,6 +18,7 @@ Thumbs.db
 
 # 분석 작업 임시 파일
 *.tmp
+analysis/find_*.py
 
 # PyInstaller 산출물
 build/

@@ -5,6 +5,16 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: '릴리스 버전 (예: v0.3.0). v 접두어 권장. 이 값이 태그/릴리스 이름이 됩니다.'
+        required: true
+        default: 'v0.1.0'
+      prerelease:
+        description: 'prerelease 로 표시할지 여부'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -51,7 +61,7 @@ jobs:
     name: Create GitHub Release
     needs: build-windows
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,13 +72,26 @@ jobs:
           name: koukai2_editor-windows
           path: dist
 
+      - name: Determine release tag
+        id: tag
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: ${{ steps.tag.outputs.name }}
+          prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
           files: dist/koukai2_editor.exe
           generate_release_notes: true
           body: |
-            대항해시대 II 세이브 에디터 (Python 재구현) ${{ github.ref_name }}
+            대항해시대 II 세이브 에디터 (Python 재구현) ${{ steps.tag.outputs.name }}
 
             ## 사용법
             1. `koukai2_editor.exe` 를 게임 폴더 (KOUKAI2.DAT 가 있는 곳) 에 복사
@@ -78,4 +101,4 @@ jobs:
             ## 백업 권장
             편집 전 `KOUKAI2.DAT` 와 `MAIN.EXE` 를 백업하세요.
 
-            상세는 [README.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/README.md) 참조.
+            상세는 [README.md](https://github.com/${{ github.repository }}/blob/master/README.md) 참조.

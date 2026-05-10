@@ -170,10 +170,14 @@ def main() -> int:
     state.game_dir = save_path.resolve().parent
 
     try:
-        sel_save(state)
-        if state.eXit == 1:
-            return 0
-        select_menu(state)
+        # sel_save → select_menu 반복. select_menu 가 0(처음 메뉴) 으로
+        # 빠져나오면 sel_save 를 다시 보여주고, sel_save 의 0(종료) 에서만
+        # 루프를 빠져나간다.
+        while True:
+            sel_save(state)
+            if state.eXit == 1:
+                break
+            select_menu(state)
     finally:
         fp.close()
     return 0

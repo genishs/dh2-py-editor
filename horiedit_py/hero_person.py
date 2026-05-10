@@ -124,15 +124,14 @@ def conferm_hero(state: EditorState) -> None:
 def sel_save(state: EditorState) -> None:
     """세이브 슬롯 선택 메뉴.
 
-    원본은 0=취소, 1..10=슬롯, 그 외 재입력. 본 재구현은 11번 항목으로
-    "게임 기본 설정 변경" (B 담당)을 별도로 추가 표시한다 (선택값 0).
-    분담 명세에 따라 '0) 게임 기본 설정 변경' 으로 보여주고, 슬롯은 1..10.
-    종료는 빈 입력 또는 슬롯 선택 후 취소.
+    메뉴:
+      0  = 프로그램 종료
+      1..10 = 세이브 슬롯 선택 → 메인 메뉴로 진입
+      11 = 게임 기본 설정 변경 (MAIN.EXE 편집)
     """
     while True:
         _clear_screen()
-        print("\n                    대항해시대 II 세이브 에디터  Ver 1.4 (Python)\n")
-        print(" 0) 게임 기본 설정 변경")
+        print("\n                    대항해시대 II 세이브 에디터  Ver 0.1\n")
         print("    {:<11s}  {:<14s} {:<26s}".format("메 모", " 항 구", "주 인 공"))
 
         for i in range(10):
@@ -159,22 +158,16 @@ def sel_save(state: EditorState) -> None:
                 hero_name = f"{decode_kr(ps.fname)} {decode_kr(ps.lname)}"
                 print(f"{i+1:2d}) {memo:<12s} {star}{port_disp:<14s} {hero_name:<26s}")
 
-        print("\n원하시는 세이브 번호를 선택해 주세요 (0=설정, 1-10=슬롯, 그 외=종료)")
-        sel = _ask_int(" => ", default=99)
+        print()
+        print("11) 게임 기본 설정 변경")
+        print(" 0) 프로그램 종료")
+        print("\n원하시는 번호를 선택해 주세요 (1-10=슬롯, 11=설정, 0=종료)")
+        sel = _ask_int(" => ", default=-1)
 
-        # 0 → 게임 기본 설정 (B 담당)
+        # 0 → 종료
         if sel == 0:
-            try:
-                from . import game_settings  # type: ignore
-                if hasattr(game_settings, "game_settings_menu"):
-                    game_settings.game_settings_menu(state)
-                else:
-                    print("(B 담당자 구현 대기 중)")
-                    _pause()
-            except ImportError:
-                print("(B 담당자 구현 대기 중)")
-                _pause()
-            continue
+            state.eXit = 1
+            return
 
         # 1..10 슬롯
         if 1 <= sel <= 10:
@@ -194,9 +187,21 @@ def sel_save(state: EditorState) -> None:
                 state.port_name[i] = decode_kr(port.name)
             return
 
-        # 그 외 → 종료
-        state.eXit = 1
-        return
+        # 11 → 게임 기본 설정 변경
+        if sel == 11:
+            try:
+                from . import game_settings  # type: ignore
+                if hasattr(game_settings, "game_settings_menu"):
+                    game_settings.game_settings_menu(state)
+                else:
+                    print("(구현 대기 중)")
+                    _pause()
+            except ImportError:
+                print("(구현 대기 중)")
+                _pause()
+            continue
+
+        # 그 외 → 메뉴 재표시
 
 
 # ---------------------------------------------------------------------------
@@ -472,10 +477,10 @@ def person_edit(state: EditorState) -> None:
 # ---------------------------------------------------------------------------
 
 def select_menu(state: EditorState) -> None:
-    """메인 메뉴. 0=종료, 1..5 분기."""
+    """메인 메뉴. 0=처음 메뉴(sel_save)로, 1..5 분기."""
     while True:
         _clear_screen()
-        print("0) 종료")
+        print("0) 처음 메뉴로 돌아가기")
         print("1) 주인공 데이타 에디트")
         print("2) 인물 데이타 에디트")
         print("3) 주인공 선박 에디트")
