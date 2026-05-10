@@ -125,7 +125,22 @@ class SettingsTab(ttk.Frame):
     # ---------------- 내부 구성 ----------------
 
     def _build_initial(self) -> None:
-        # 위쪽 안내 라벨 (항상 표시)
+        # 시험 기능 경고 (탭 최상단, 강조)
+        warning = ttk.Label(
+            self,
+            text=(
+                "⚠️ 시험 기능 — 게임이 정상 실행되지 않을 수 있습니다.\n"
+                "   편집 전 MAIN.EXE 백업 (MAIN.EXE.bak) 을 권장합니다."
+            ),
+            foreground="#a00",
+            background="#fff8dc",
+            padding=8,
+            justify="left",
+            font=("TkDefaultFont", 10, "bold"),
+        )
+        warning.pack(side="top", fill="x", padx=8, pady=(8, 4))
+
+        # 기존 안내 라벨 (항상 표시)
         self._hint_label = ttk.Label(
             self, text=_HEADER_HINT, foreground="#555", justify="left"
         )

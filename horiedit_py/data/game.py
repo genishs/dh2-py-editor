@@ -30,6 +30,16 @@ MAINEXE_SHIP_RECORD_ROM = 0x0407D8        # MAIN.EXE record ROM (12 × 25 = 300 
 SHIP_RECORD_OFFSET_IN_SLOT = 0x528F       # KOUKAI2.DAT 슬롯 N 내 record 시작
 SHIP_RECORD_SIZE = 12
 
+# === 선박 가격 + 선박 분류 (analysis_H 확정) ===
+# record +9 (1 byte) = ship_class (선박 분류 0..5)
+# record +10..+11 (2 byte u16 LE, ×10 표시) = price_stored
+# (analysis_G 의 none[3] 영역은 사실 [ship_class, price_stored_lo, price_stored_hi].)
+SHIP_CLASS_OFFSET_IN_RECORD = 9
+PRICE_OFFSET_IN_RECORD = 10
+PRICE_SCALE = 10  # 표시값 = stored × 10
+PRICE_MAX_DISPLAY = 0xFFFF * PRICE_SCALE  # 655,350
+
+
 # 폐기된 추정 (analysis_G 에서 record 구조 발견 → 추정 위치는 잘못된 것으로 확정):
 # - MAINEXE_KOGYO_TABLE_ESTIMATED = 0x42722  (analysis_C, 항구 카탈로그였음)
 # - KOGYO_OFFSET_IN_SLOT = 0x06FEB           (analysis_D, ×10 ≠ 검증값)
@@ -95,18 +105,19 @@ def main_exe_path(state: "EditorState") -> Optional[Path]:
     return p if p.is_file() else None
 
 
-# === 슬롯 내 함선 record (analysis_G 확정) ===
+# === 슬롯 내 함선 record (analysis_G + analysis_H 확정) ===
 #
-# record 레이아웃 (12 byte):
-#   +0 kogyo_stored   (u8, 표시값 = 저장값 × 10)
-#   +1 lhull          (u8 직접)
-#   +2 lrudder        (u8) ─┐
-#   +3 lsail          (u8)  │
-#   +4 lcrew_stored   (u8)  │ Ship4 (12 byte) 와 동일 영역
-#   +5 dcrew          (u8)  │ ─ 단 마지막 2 byte 가 다음 함선의
-#   +6 capacity       (u16) │   [kogyo, lhull] 로 겹침에 유의.
-#   +8 lnowea         (u8)  │
-#   +9 none[3]        (3B) ─┘
+# record 레이아웃 (12 byte, 모든 byte 가 의미 있음):
+#   +0  kogyo_stored   (u8, 표시값 = 저장값 × 10)
+#   +1  lhull          (u8 직접)
+#   +2  lrudder        (u8) ─┐
+#   +3  lsail          (u8)  │
+#   +4  lcrew_stored   (u8)  │ Ship4 (12 byte) 와 동일 영역
+#   +5  dcrew          (u8)  │ ─ 단 마지막 2 byte 가 다음 함선의
+#   +6  capacity       (u16) │   [kogyo, lhull] 로 겹침에 유의.
+#   +8  lnowea         (u8)  │
+#   +9  ship_class     (u8) ─┘ 선박 분류 0..5 (analysis_H)
+#   +10 price_stored   (u16 LE) 표시 가격 = stored × 10 (analysis_H)
 
 
 def load_record_kogyo(state: "EditorState", ship_type: int) -> int:
@@ -186,4 +197,121 @@ def save_rom_record_lhull(main_exe: Path, ship_type: int, lhull: int) -> None:
     with main_exe.open("r+b") as fp:
         fp.seek(offset)
         fp.write(bytes([lhull & 0xFF]))
+        fp.flush()
+
+
+# === 선박 가격 / 선박 분류 (analysis_H 확정) ===
+#
+# 슬롯 record:
+#   +9      ship_class    u8       (0..5 의 6 가지)
+#   +10..11 price_stored  u16 LE   (표시 가격 = stored × 10, 0..655,350)
+#
+# MAIN.EXE record ROM 도 동일한 record 레이아웃 (record ROM = 0x0407D8) 을 가진다.
+
+
+def load_record_ship_class(state: "EditorState", ship_type: int) -> int:
+    """슬롯 record +9 byte (선박 분류 0..5)."""
+    _check_ship_type(ship_type)
+    offset = (
+        state.page + SHIP_RECORD_OFFSET_IN_SLOT
+        + ship_type * SHIP_RECORD_SIZE + SHIP_CLASS_OFFSET_IN_RECORD
+    )
+    raw = state.read(offset, 1)
+    if len(raw) < 1:
+        raise OSError(f"세이브가 너무 짧습니다 (record ship_class @ 0x{offset:X}).")
+    return raw[0]
+
+
+def save_record_ship_class(state: "EditorState", ship_type: int, ship_class: int) -> None:
+    """슬롯 record +9 byte 갱신 (u8). 입력은 0..255 (보통 0..5)."""
+    _check_ship_type(ship_type)
+    if not (0 <= ship_class <= 0xFF):
+        raise ValueError("선박 분류는 0..255 범위여야 합니다.")
+    offset = (
+        state.page + SHIP_RECORD_OFFSET_IN_SLOT
+        + ship_type * SHIP_RECORD_SIZE + SHIP_CLASS_OFFSET_IN_RECORD
+    )
+    state.write(offset, bytes([ship_class & 0xFF]))
+
+
+def load_record_price(state: "EditorState", ship_type: int) -> int:
+    """슬롯 record +10..+11 의 u16 LE × 10 = 표시 가격 (0..655,350)."""
+    _check_ship_type(ship_type)
+    offset = (
+        state.page + SHIP_RECORD_OFFSET_IN_SLOT
+        + ship_type * SHIP_RECORD_SIZE + PRICE_OFFSET_IN_RECORD
+    )
+    raw = state.read(offset, 2)
+    if len(raw) < 2:
+        raise OSError(f"세이브가 너무 짧습니다 (record price @ 0x{offset:X}).")
+    return int.from_bytes(raw, "little") * PRICE_SCALE
+
+
+def save_record_price(state: "EditorState", ship_type: int, price_display: int) -> None:
+    """슬롯 record +10..+11 갱신. 입력은 표시값 (10 의 배수, 0..655,350)."""
+    _check_ship_type(ship_type)
+    if price_display < 0 or price_display > PRICE_MAX_DISPLAY:
+        raise ValueError(f"선박 가격 범위 초과 (0..{PRICE_MAX_DISPLAY}).")
+    if price_display % PRICE_SCALE != 0:
+        raise ValueError(f"선박 가격은 {PRICE_SCALE} 의 배수여야 합니다.")
+    stored = price_display // PRICE_SCALE
+    if not (0 <= stored <= 0xFFFF):
+        raise ValueError("선박 가격 stored 가 u16 범위를 벗어났습니다.")
+    offset = (
+        state.page + SHIP_RECORD_OFFSET_IN_SLOT
+        + ship_type * SHIP_RECORD_SIZE + PRICE_OFFSET_IN_RECORD
+    )
+    state.write(offset, stored.to_bytes(2, "little"))
+
+
+def load_rom_record_ship_class(main_exe: Path, ship_type: int) -> int:
+    """MAIN.EXE record ROM 의 +9 byte (선박 분류 0..5)."""
+    _check_ship_type(ship_type)
+    offset = MAINEXE_SHIP_RECORD_ROM + ship_type * SHIP_RECORD_SIZE + SHIP_CLASS_OFFSET_IN_RECORD
+    with main_exe.open("rb") as fp:
+        fp.seek(offset)
+        data = fp.read(1)
+    if len(data) < 1:
+        raise OSError(f"MAIN.EXE 가 너무 짧습니다 (record ship_class @ 0x{offset:X}).")
+    return data[0]
+
+
+def save_rom_record_ship_class(main_exe: Path, ship_type: int, ship_class: int) -> None:
+    """MAIN.EXE record ROM 의 +9 byte 갱신 (u8)."""
+    _check_ship_type(ship_type)
+    if not (0 <= ship_class <= 0xFF):
+        raise ValueError("선박 분류는 0..255 범위여야 합니다.")
+    offset = MAINEXE_SHIP_RECORD_ROM + ship_type * SHIP_RECORD_SIZE + SHIP_CLASS_OFFSET_IN_RECORD
+    with main_exe.open("r+b") as fp:
+        fp.seek(offset)
+        fp.write(bytes([ship_class & 0xFF]))
+        fp.flush()
+
+
+def load_rom_record_price(main_exe: Path, ship_type: int) -> int:
+    """MAIN.EXE record ROM 의 +10..+11 (u16 LE × 10 = 표시 가격)."""
+    _check_ship_type(ship_type)
+    offset = MAINEXE_SHIP_RECORD_ROM + ship_type * SHIP_RECORD_SIZE + PRICE_OFFSET_IN_RECORD
+    with main_exe.open("rb") as fp:
+        fp.seek(offset)
+        data = fp.read(2)
+    if len(data) < 2:
+        raise OSError(f"MAIN.EXE 가 너무 짧습니다 (record price @ 0x{offset:X}).")
+    return int.from_bytes(data, "little") * PRICE_SCALE
+
+
+def save_rom_record_price(main_exe: Path, ship_type: int, price_display: int) -> None:
+    """MAIN.EXE record ROM 의 +10..+11 갱신. 입력은 표시값 (10 의 배수, 0..655,350)."""
+    _check_ship_type(ship_type)
+    if price_display < 0 or price_display > PRICE_MAX_DISPLAY:
+        raise ValueError(f"선박 가격 범위 초과 (0..{PRICE_MAX_DISPLAY}).")
+    if price_display % PRICE_SCALE != 0:
+        raise ValueError(f"선박 가격은 {PRICE_SCALE} 의 배수여야 합니다.")
+    stored = price_display // PRICE_SCALE
+    if not (0 <= stored <= 0xFFFF):
+        raise ValueError("선박 가격 stored 가 u16 범위를 벗어났습니다.")
+    offset = MAINEXE_SHIP_RECORD_ROM + ship_type * SHIP_RECORD_SIZE + PRICE_OFFSET_IN_RECORD
+    with main_exe.open("r+b") as fp:
+        fp.seek(offset)
+        fp.write(stored.to_bytes(2, "little"))
         fp.flush()

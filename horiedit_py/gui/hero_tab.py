@@ -85,9 +85,9 @@ class HeroTab(ttk.Frame):
         # 명성
         fame = ttk.LabelFrame(self, text="명성", padding=8)
         fame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=(0, 6), pady=4)
-        self._add_spinbox(fame, 0, "무역 명성", self._var_trade, 0, 65535)
-        self._add_spinbox(fame, 1, "해적 명성", self._var_robber, 0, 65535)
-        self._add_spinbox(fame, 2, "모험 명성", self._var_adven, 0, 65535)
+        self._add_spinbox(fame, 0, "교역 명성", self._var_trade, 0, 50000)
+        self._add_spinbox(fame, 1, "해적 명성", self._var_robber, 0, 50000)
+        self._add_spinbox(fame, 2, "모험 명성", self._var_adven, 0, 50000)
 
         # 자금 + 작위
         misc = ttk.LabelFrame(self, text="자금 / 작위", padding=8)
@@ -100,8 +100,8 @@ class HeroTab(ttk.Frame):
         self._cb_peer.grid(row=1, column=1, sticky="w", padx=4, pady=4)
         self._cb_peer.bind("<<ComboboxSelected>>", self._on_dirty_event)
 
-        # 친밀도
-        favor = ttk.LabelFrame(self, text="친밀도 (-100 ~ +100)", padding=8)
+        # 친밀도 (각 나라와의 관계)
+        favor = ttk.LabelFrame(self, text="각 나라와의 관계", padding=8)
         favor.grid(row=2, column=0, columnspan=4, sticky="nsew", pady=8)
         for i, (label, key) in enumerate(_FAVOR_LABELS):
             r, c = divmod(i, 3)
@@ -293,12 +293,12 @@ class HeroTab(ttk.Frame):
         except (tk.TclError, ValueError):
             raise ValueError("주인공: 숫자 필드에 잘못된 값이 있습니다.")
 
-        if not _in_range(trade, 0, 65535):
-            raise ValueError("주인공: 무역 명성은 0..65535 범위여야 합니다.")
-        if not _in_range(robber, 0, 65535):
-            raise ValueError("주인공: 해적 명성은 0..65535 범위여야 합니다.")
-        if not _in_range(adven, 0, 65535):
-            raise ValueError("주인공: 모험 명성은 0..65535 범위여야 합니다.")
+        if not _in_range(trade, 0, 50000):
+            raise ValueError("주인공: 교역 명성은 0..50000 범위여야 합니다.")
+        if not _in_range(robber, 0, 50000):
+            raise ValueError("주인공: 해적 명성은 0..50000 범위여야 합니다.")
+        if not _in_range(adven, 0, 50000):
+            raise ValueError("주인공: 모험 명성은 0..50000 범위여야 합니다.")
         if not _in_range(money, 0, 0xFFFFFFFF):
             raise ValueError("주인공: 자금은 0..4294967295 범위여야 합니다.")
 

@@ -31,10 +31,15 @@ from horiedit_py.common import (
 # horiedit.h 의 ship4_addr (0x5291) 은 record 의 +2 (lrudder) 부터 시작
 # (off-by-2). 실제 record 시작은 슬롯 +0x528F / MAIN.EXE 0x0407D8.
 from horiedit_py.data.game import (
+    PRICE_MAX_DISPLAY,
+    PRICE_SCALE,
     load_record_kogyo,
     load_record_lhull,
+    load_record_price,
+    load_record_ship_class,
     save_record_kogyo,
     save_record_lhull,
+    save_record_price,
 )
 from horiedit_py.data.ship import (
     cargo_recalc,
@@ -167,20 +172,20 @@ class _FleetEditor(ttk.Frame):
         right.grid(row=1, column=1, sticky="nsew")
 
         r = 0
-        self._sp_ccrew = self._add_spinbox(right, r, "현재 승무원", self._var_ccrew, 0, 65535); r += 1
-        self._sp_chull = self._add_spinbox(right, r, "현재 선체", self._var_chull, 0, 255); r += 1
-        self._sp_lhull = self._add_spinbox(right, r, "최대 선체", self._var_lhull, 0, 255); r += 1
-        self._sp_crudder = self._add_spinbox(right, r, "현재 회전력", self._var_crudder, 0, 255); r += 1
-        self._sp_csail = self._add_spinbox(right, r, "현재 돛", self._var_csail, 0, 255); r += 1
-        self._sp_cnowea = self._add_spinbox(right, r, "현재 무기수", self._var_cnowea, 0, 255); r += 1
+        self._sp_ccrew = self._add_spinbox(right, r, "현재 선원수", self._var_ccrew, 0, 65535); r += 1
+        self._sp_chull = self._add_spinbox(right, r, "현재 내구력", self._var_chull, 0, 255); r += 1
+        self._sp_lhull = self._add_spinbox(right, r, "최대 내구력", self._var_lhull, 0, 255); r += 1
+        self._sp_crudder = self._add_spinbox(right, r, "현재 선회력", self._var_crudder, 0, 255); r += 1
+        self._sp_csail = self._add_spinbox(right, r, "현재 추진력", self._var_csail, 0, 255); r += 1
+        self._sp_cnowea = self._add_spinbox(right, r, "현재 포문수", self._var_cnowea, 0, 255); r += 1
         self._sp_condition = self._add_spinbox(right, r, "현재 컨디션", self._var_condition, 0, 255); r += 1
 
-        ttk.Label(right, text="카르고").grid(row=r, column=0, sticky="w", padx=4, pady=4)
+        ttk.Label(right, text="최대 적재량").grid(row=r, column=0, sticky="w", padx=4, pady=4)
         ttk.Label(right, textvariable=self._var_cargo).grid(row=r, column=1, sticky="w", padx=4, pady=4)
         r += 1
 
-        self._sp_f_crew = self._add_spinbox(right, r, "최대 적재 승무원", self._var_f_crew, 0, 65535); r += 1
-        self._sp_f_weap = self._add_spinbox(right, r, "최대 적재 무기수", self._var_f_weap, 0, 255); r += 1
+        self._sp_f_crew = self._add_spinbox(right, r, "최대 선원수", self._var_f_crew, 0, 65535); r += 1
+        self._sp_f_weap = self._add_spinbox(right, r, "최대 포문수", self._var_f_weap, 0, 255); r += 1
 
         ttk.Label(right, text="현재 무기").grid(row=r, column=0, sticky="w", padx=4, pady=4)
         self._cb_cselwea = ttk.Combobox(
@@ -191,7 +196,7 @@ class _FleetEditor(ttk.Frame):
         self._cb_cselwea.bind("<<ComboboxSelected>>", self._on_dirty_event)
         r += 1
 
-        ttk.Label(right, text="현재 진형").grid(row=r, column=0, sticky="w", padx=4, pady=4)
+        ttk.Label(right, text="선수상").grid(row=r, column=0, sticky="w", padx=4, pady=4)
         self._cb_form = ttk.Combobox(
             right, textvariable=self._var_form, values=list(form_name),
             state="readonly", width=14,
@@ -200,7 +205,7 @@ class _FleetEditor(ttk.Frame):
         self._cb_form.bind("<<ComboboxSelected>>", self._on_dirty_event)
         r += 1
 
-        ttk.Label(right, text="현재 함선").grid(row=r, column=0, sticky="w", padx=4, pady=4)
+        ttk.Label(right, text="함선종류").grid(row=r, column=0, sticky="w", padx=4, pady=4)
         self._cb_ship_select = ttk.Combobox(
             right, textvariable=self._var_ship_select, values=[],
             state="readonly", width=22,
@@ -443,15 +448,15 @@ class _FleetEditor(ttk.Frame):
             raise ValueError("나의 함대: 숫자 필드에 잘못된 값이 있습니다.")
 
         bounds = [
-            ("현재 승무원", ccrew, 0, 0xFFFF),
-            ("현재 선체", chull, 0, 0xFF),
-            ("최대 선체", lhull, 0, 0xFF),
-            ("현재 회전력", crudder, 0, 0xFF),
-            ("현재 돛", csail, 0, 0xFF),
-            ("현재 무기수", cnowea, 0, 0xFF),
+            ("현재 선원수", ccrew, 0, 0xFFFF),
+            ("현재 내구력", chull, 0, 0xFF),
+            ("최대 내구력", lhull, 0, 0xFF),
+            ("현재 선회력", crudder, 0, 0xFF),
+            ("현재 추진력", csail, 0, 0xFF),
+            ("현재 포문수", cnowea, 0, 0xFF),
             ("현재 컨디션", condition, 0, 0xFF),
-            ("최대 적재 승무원", f_crew, 0, 0xFFFF),
-            ("최대 적재 무기수", f_weap, 0, 0xFF),
+            ("최대 선원수", f_crew, 0, 0xFFFF),
+            ("최대 포문수", f_weap, 0, 0xFF),
         ]
         for name, v, lo, hi in bounds:
             if not (lo <= v <= hi):
@@ -464,13 +469,13 @@ class _FleetEditor(ttk.Frame):
         try:
             fi = list(form_name).index(self._var_form.get())
         except ValueError:
-            raise ValueError("나의 함대: 현재 진형을 선택하세요.")
+            raise ValueError("나의 함대: 선수상을 선택하세요.")
         try:
             si = list(self._state.ship_name).index(self._var_ship_select.get())
         except ValueError:
-            raise ValueError("나의 함대: 현재 함선(종류)을 선택하세요.")
+            raise ValueError("나의 함대: 함선종류를 선택하세요.")
         if not (0 <= si < 25):
-            raise ValueError("나의 함대: 함선 종류 인덱스가 범위를 벗어났습니다.")
+            raise ValueError("나의 함대: 함선종류 인덱스가 범위를 벗어났습니다.")
 
         ship_name_raw = encode_kr_fixed(self._var_ship_name.get(), 14)
 
@@ -577,10 +582,13 @@ class _OrgShipEditor(ttk.Frame):
     편집 대상:
       - Ship5 (슬롯 내) : 배이름
       - Ship4 (슬롯 내) : lsail / lrudder / capacity / lcrew / dcrew / lnowea
-      - record (슬롯 내, analysis_G) : +0 kogyo (×10 표시) / +1 lhull (u8 직접)
+      - record (슬롯 내, analysis_G + analysis_H):
+          +0  kogyo (×10 표시),  +1  lhull (u8 직접),
+          +9  ship_class (분류 0..5, 보기 전용),
+          +10 price_stored (u16 LE × 10 표시).
 
-    record 는 Ship4 와 동일 영역 (record +2 ~ +13) 을 공유하면서 첫 두 byte
-    [kogyo, lhull] 만 추가로 노출한다.
+    record 는 Ship4 와 동일 영역 (record +2 ~ +9 일부) 을 공유하면서
+    [kogyo, lhull, ship_class, price] 를 추가로 노출한다.
     """
 
     def __init__(self, master: tk.Misc, state: EditorState) -> None:
@@ -592,7 +600,7 @@ class _OrgShipEditor(ttk.Frame):
         self._dirty = False
         self._dirty_listeners: list[Callable[[], None]] = []
 
-        # 위젯 변수 (Ship4 / Ship5 in slot + record kogyo/lhull)
+        # 위젯 변수 (Ship4 / Ship5 in slot + record kogyo/lhull/price/class)
         self._var_name = tk.StringVar()
         self._var_lsail = tk.IntVar(value=0)
         self._var_lrudder = tk.IntVar(value=0)
@@ -602,10 +610,16 @@ class _OrgShipEditor(ttk.Frame):
         self._var_lcrew = tk.IntVar(value=0)
         self._var_dcrew = tk.IntVar(value=0)
         self._var_lnowea = tk.IntVar(value=0)
+        # 선박 분류 (record +9, read-only) — 표시 전용
+        self._var_ship_class = tk.IntVar(value=0)
+        # 선박 가격 (record +10..+11, ×10 표시값)
+        self._var_price = tk.IntVar(value=0)
 
         # 디스크에서 마지막으로 읽은 record 값 (commit 시 변경 비교용)
         self._loaded_kogyo: int = 0
         self._loaded_lhull: int = 0
+        self._loaded_ship_class: int = 0
+        self._loaded_price: int = 0  # 표시값 (×10 적용된)
 
         self._ship4: Optional[Ship4] = None
         self._ship5: Optional[Ship5] = None
@@ -635,25 +649,63 @@ class _OrgShipEditor(ttk.Frame):
         right.grid(row=1, column=1, sticky="nsew")
 
         r = 0
+        # 1) 배이름
         ttk.Label(right, text="배이름").grid(row=r, column=0, sticky="w", padx=4, pady=4)
         self._en_name = ttk.Entry(right, textvariable=self._var_name, width=24)
         self._en_name.grid(row=r, column=1, sticky="w", padx=4, pady=4); r += 1
 
+        # 2) 추진력 / 3) 선회력
         self._sp_lsail = self._add_spinbox(right, r, "추진력 (lsail)", self._var_lsail, 0, 255); r += 1
         self._sp_lrudder = self._add_spinbox(right, r, "선회력 (lrudder)", self._var_lrudder, 0, 255); r += 1
 
-        # 등장공업치 (kogyo) — record +0. 표시값 = 저장값 × 10.
-        # 입력은 표시값 직접. 저장 시 // 10 후 u8 (0..255) 로 클램프.
+        # 4) 등장공업치 (kogyo) — record +0. 표시값 = 저장값 × 10.
         self._sp_kogyo = self._add_spinbox(right, r, "등장공업치", self._var_kogyo, 0, 2550); r += 1
-        # 최대 내구도 (lhull) — record +1. u8 직접.
+        # 5) 최대 내구도 (lhull) — record +1. u8 직접.
         self._sp_lhull = self._add_spinbox(right, r, "최대 내구도", self._var_lhull, 0, 255); r += 1
 
+        # 6) 최대 적재량
         self._sp_capacity = self._add_spinbox(right, r, "최대 적재량", self._var_capacity, 0, 65535); r += 1
-        self._sp_lcrew = self._add_spinbox(right, r, "최대 승무원", self._var_lcrew, 0, 2550); r += 1
-        self._sp_dcrew = self._add_spinbox(right, r, "필요 승무원", self._var_dcrew, 0, 255); r += 1
-        self._sp_lnowea = self._add_spinbox(right, r, "최대 무기수", self._var_lnowea, 0, 255); r += 1
+        # 7) 최대 선원수 (lcrew × 10)
+        self._sp_lcrew = self._add_spinbox(right, r, "최대 선원수", self._var_lcrew, 0, 2550); r += 1
+        # 8) 필요 선원수 (dcrew)
+        self._sp_dcrew = self._add_spinbox(right, r, "필요 선원수", self._var_dcrew, 0, 255); r += 1
+        # 9) 최대 포문수 (lnowea)
+        self._sp_lnowea = self._add_spinbox(right, r, "최대 포문수", self._var_lnowea, 0, 255); r += 1
+
+        # 10) 선박 분류 (record +9) — 보기 전용. 다음 버전에서 편집 가능.
+        ttk.Label(right, text="선박 분류 (0..5, 보기 전용)").grid(
+            row=r, column=0, sticky="w", padx=4, pady=4
+        )
+        self._sp_ship_class = ttk.Spinbox(
+            right, from_=0, to=255,
+            textvariable=self._var_ship_class, width=10, state="disabled",
+        )
+        self._sp_ship_class.grid(row=r, column=1, sticky="w", padx=4, pady=4); r += 1
+
+        # 11) 선박 가격 (record +10..+11, u16 LE × 10). 0..655,350, 10 단위 step.
+        self._sp_price = self._add_price_spinbox(
+            right, r, "선박 가격", self._var_price, 0, PRICE_MAX_DISPLAY, PRICE_SCALE,
+        ); r += 1
 
         self.columnconfigure(1, weight=1)
+
+    def _add_price_spinbox(
+        self,
+        parent: tk.Misc,
+        row: int,
+        label: str,
+        var: tk.IntVar,
+        lo: int,
+        hi: int,
+        increment: int,
+    ) -> ttk.Spinbox:
+        ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=4, pady=4)
+        sp = ttk.Spinbox(
+            parent, from_=lo, to=hi, increment=increment,
+            textvariable=var, width=12,
+        )
+        sp.grid(row=row, column=1, sticky="w", padx=4, pady=4)
+        return sp
 
     def _add_spinbox(
         self, parent: tk.Misc, row: int, label: str, var: tk.IntVar, lo: int, hi: int,
@@ -671,6 +723,7 @@ class _OrgShipEditor(ttk.Frame):
             self._var_kogyo, self._var_lhull,
             self._var_capacity,
             self._var_lcrew, self._var_dcrew, self._var_lnowea,
+            self._var_price,  # 분류는 보기 전용이므로 dirty 추적 안 함
         ):
             v.trace_add("write", self._on_var_write)
         self._var_name.trace_add("write", self._on_var_write)
@@ -767,15 +820,21 @@ class _OrgShipEditor(ttk.Frame):
         self._ship4 = ship4
         self._ship5 = ship5
 
-        # record (analysis_G): +0 = kogyo (×10 표시), +1 = lhull (u8).
+        # record (analysis_G + analysis_H):
+        #   +0 kogyo (×10 표시), +1 lhull (u8),
+        #   +9 ship_class (u8 분류 0..5),  +10..11 price_stored (u16 LE × 10).
         try:
             kogyo_stored = load_record_kogyo(self._state, sel)
             lhull_val = load_record_lhull(self._state, sel)
+            ship_class = load_record_ship_class(self._state, sel)
+            price_disp = load_record_price(self._state, sel)
         except Exception as e:
             messagebox.showerror("템플릿 로드 실패", f"record 읽기 실패: {e}")
             return
         self._loaded_kogyo = kogyo_stored
         self._loaded_lhull = lhull_val
+        self._loaded_ship_class = ship_class
+        self._loaded_price = price_disp
 
         self._var_name.set(decode_kr(ship5.name))
         self._var_lsail.set(ship4.lsail)
@@ -786,6 +845,8 @@ class _OrgShipEditor(ttk.Frame):
         self._var_lcrew.set((ship4.lcrew & 0xFF) * 10)
         self._var_dcrew.set(ship4.dcrew)
         self._var_lnowea.set(ship4.lnowea)
+        self._var_ship_class.set(ship_class)
+        self._var_price.set(price_disp)
 
         self._set_form_state("normal")
 
@@ -820,6 +881,7 @@ class _OrgShipEditor(ttk.Frame):
             lcrew_x10 = int(self._var_lcrew.get())
             dcrew = int(self._var_dcrew.get())
             lnowea = int(self._var_lnowea.get())
+            price_disp = int(self._var_price.get())
         except (tk.TclError, ValueError):
             raise ValueError("원래 함선 정보: 숫자 필드에 잘못된 값이 있습니다.")
 
@@ -829,13 +891,18 @@ class _OrgShipEditor(ttk.Frame):
             ("등장공업치", kogyo_disp, 0, 2550),
             ("최대 내구도", lhull_val, 0, 0xFF),
             ("최대 적재량", capacity, 0, 0xFFFF),
-            ("최대 승무원", lcrew_x10, 0, 2550),
-            ("필요 승무원", dcrew, 0, 0xFF),
-            ("최대 무기수", lnowea, 0, 0xFF),
+            ("최대 선원수", lcrew_x10, 0, 2550),
+            ("필요 선원수", dcrew, 0, 0xFF),
+            ("최대 포문수", lnowea, 0, 0xFF),
+            ("선박 가격", price_disp, 0, PRICE_MAX_DISPLAY),
         ]
         for name, v, lo, hi in bounds:
             if not (lo <= v <= hi):
                 raise ValueError(f"원래 함선 정보: {name} 은 {lo}..{hi} 범위여야 합니다.")
+        if price_disp % PRICE_SCALE != 0:
+            raise ValueError(
+                f"원래 함선 정보: 선박 가격은 {PRICE_SCALE} 의 배수여야 합니다."
+            )
 
         old4 = self._ship4
         old5 = self._ship5
@@ -884,6 +951,14 @@ class _OrgShipEditor(ttk.Frame):
             except Exception as e:
                 raise ValueError(f"원래 함선 정보: 최대 내구도 저장 실패: {e}")
             self._loaded_lhull = lhull_val & 0xFF
+
+        # 선박 가격 (record +10..+11). 분류 (+9) 는 보기 전용 — 저장하지 않음.
+        if price_disp != self._loaded_price:
+            try:
+                save_record_price(self._state, sel, price_disp)
+            except Exception as e:
+                raise ValueError(f"원래 함선 정보: 선박 가격 저장 실패: {e}")
+            self._loaded_price = price_disp
 
         new_name_str = decode_kr(new_ship5.name)
         if 0 <= sel < len(self._state.ship_name):
@@ -938,6 +1013,7 @@ class _OrgShipEditor(ttk.Frame):
         try:
             self._var_kogyo.set(self._loaded_kogyo * 10)
             self._var_lhull.set(self._loaded_lhull)
+            self._var_price.set(self._loaded_price)
         finally:
             self._loading = prev_loading
 
@@ -948,9 +1024,15 @@ class _OrgShipEditor(ttk.Frame):
             self._en_name, self._sp_lsail, self._sp_lrudder,
             self._sp_kogyo, self._sp_lhull,
             self._sp_capacity, self._sp_lcrew, self._sp_dcrew, self._sp_lnowea,
+            self._sp_price,
         )
         for w in widgets:
             try:
                 w.configure(state=st)
             except tk.TclError:
                 pass
+        # 선박 분류 (read-only) — 항상 disabled 유지.
+        try:
+            self._sp_ship_class.configure(state="disabled")
+        except tk.TclError:
+            pass

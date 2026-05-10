@@ -34,10 +34,10 @@ _STAT_FIELDS: list[tuple[str, str, int, int]] = [
     ("항해", "sail", 0, 255),
     ("지식", "know", 0, 255),
     ("직감", "hunch", 0, 255),
-    ("공구", "tool", 0, 255),
+    ("용기", "tool", 0, 255),
     ("검술", "sword", 0, 255),
     ("매력", "charm", 0, 255),
-    ("행운", "death", 0, 255),
+    ("운명", "death", 0, 255),
 ]
 
 _LEVEL_FIELDS: list[tuple[str, str, int, int]] = [
@@ -52,11 +52,11 @@ _EXP_FIELDS: list[tuple[str, str, int, int]] = [
 
 # (라벨, 비트키) 5개
 _ABILITY_FIELDS: list[tuple[str, str]] = [
-    ("점술", "td"),
+    ("교섭", "td"),
     ("회계", "ac"),
-    ("구급", "gu"),
+    ("포술", "gu"),
     ("지도작성", "mp"),
-    ("검술메뉴", "me"),
+    ("측량", "me"),
 ]
 
 
