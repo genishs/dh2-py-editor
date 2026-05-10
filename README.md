@@ -91,28 +91,42 @@ GUI 도구.
 함선 종류 변경 시 Ship5.bform 비트 합성 + 모든 클램프 체인 자동 적용,
 cargo 자동 재계산.
 
-**함선 종류** (`org_ship_edit` 대응) — 좌측 25종 목록 + 우측 7항목 폼
-(배이름/추진력/선회력/최대 적재량/최대 승무원/필요 승무원/최대 무기수).
+**함선 종류** (`org_ship_edit` 대응) — 좌측 25종 목록 + 우측 폼.
 한도 변경 시 그 종류를 사용 중인 모든 영웅 함대로 클램프 자동 전파.
-이름 변경은 `state.ship_name` 캐시도 동기화. **lhull 항목 없음** (분석
-결과 위치 미확인).
+이름 변경은 `state.ship_name` 캐시도 동기화.
+
+| 항목 | 설명 |
+|---|---|
+| 배이름 | Ship5.name (18 byte 한글) |
+| 추진력 (lsail) | record +3 / Ship4.lsail |
+| 선회력 (lrudder) | record +2 / Ship4.lrudder |
+| 등장공업치 (kogyo) | record +0 (u8). 표시값 = 저장값 × 10 |
+| 최대 내구도 (lhull) | record +1 (u8 직접) |
+| 최대 적재량 (capacity) | record +6 (u16 LE) / Ship4.capacity |
+| 최대 승무원 (lcrew × 10) | record +4. 저장 시 //10 |
+| 필요 승무원 (dcrew) | record +5 / Ship4.dcrew |
+| 최대 무기수 (lnowea) | record +8 / Ship4.lnowea |
+
+> 함선당 12 byte record (analysis_G 확정) — 슬롯 내 `+0x528F`,
+> `MAIN.EXE @ 0x0407D8`. horiedit.h 의 `ship4_addr = 0x5291` 은 이 record
+> 의 +2 (lrudder) 부터 시작 → off-by-2. 첫 두 byte `[kogyo, lhull]` 은
+> horiedit 가 다루지 않던 영역.
 
 ### 게임 설정 탭
 
-`MAIN.EXE` 가 같은 폴더에 있어야 활성. 내부 sub-Notebook 3개:
+`MAIN.EXE` 가 같은 폴더에 있어야 활성. 내부 sub-Notebook 2개:
 
 | Sub-tab | 위치 | 검증 | 편집 항목 |
 |---|---|---|---|
-| **함선 정적 스펙 (Ship4 ROM)** | MAIN.EXE @ 0x40871 | 확정 | lrudder/lsail/lcrew×10/dcrew/capacity/lnowea |
-| **함선 이름·외형 (Ship5 ROM)** | MAIN.EXE @ 0x405FD | 확정 | name(18B)/sform/bform 상위 4비트 |
-| **등장공업치** | 슬롯 + 0x06FEB / MAIN.EXE @ 0x42722 | 추정 | 25개 함선의 저장값 (×10 = 표시값). MAIN.EXE 동기화 체크박스 |
+| **함선 정적 스펙 (Ship4 ROM)** | MAIN.EXE @ 0x0407DA | 확정 | lrudder/lsail/lcrew×10/dcrew/capacity/lnowea |
+| **함선 이름·외형 (Ship5 ROM)** | MAIN.EXE @ 0x040566 | 확정 | name(18B)/sform/bform 상위 4비트 |
 
 read-modify-write 시 `none[*]` 패딩 byte 모두 보존.
 
-> ⚠️ **lhull 메뉴는 의도적으로 제외** — 이전 v0.2 까지의 "신조 시 최대 내구도"
-> 위치 추정(`0x424AE`)이 사용자 검증으로 잘못된 것이 확인되었습니다 (실제
-> SHIP의 lhull = 81 이지만 그 위치 idx 16 = 20). 정확한 위치는 미확인.
-> 자세한 내용은 [`analysis/analysis_E_lhull_table.md`](analysis/analysis_E_lhull_table.md) 참조.
+> 등장공업치(요구공업치) 와 최대 내구도(lhull) 는 함선 record (analysis_G)
+> 의 +0/+1 byte 임이 확정되어, [선박] 탭의 [원래 함선 정보] 에서 편집한다.
+> 이전 v0.3 까지의 "등장공업치" sub-tab (슬롯 +0x06FEB / MAIN.EXE
+> 0x42722, 추정) 은 위치가 잘못된 것으로 확인되어 제거되었다.
 
 ---
 
@@ -169,7 +183,7 @@ horiedit_py/
         hero.py                load_hero / save_hero / hero_index_active
         person.py              iter_persons / find_persons / load/save
         ship.py                load/save_fleet_entry, ship4/5, ship_num
-        game.py                MAIN.EXE Ship4/5 ROM, 추정 테이블, kogyo
+        game.py                MAIN.EXE Ship4/5 ROM, 함선 record (analysis_G)
     gui/                     Tkinter + ttk UI
         __init__.py
         app.py                 메인 윈도우, 탭 컨테이너, 상태바
@@ -182,8 +196,10 @@ analysis/                    원본 분석 노트
     analysis_A_*.md            영웅/인물/메뉴/IO
     analysis_B_*.md            선박/항구
     analysis_C_*.md            MAIN.EXE 함선 ROM
-    analysis_D_*.md            등장공업치 후보 위치
-    analysis_E_*.md            lhull 재분석 (위치 미확인)
+    analysis_D_*.md            등장공업치 후보 위치 (폐기)
+    analysis_E_*.md            lhull 재분석 (폐기)
+    analysis_F_*.md            Ship4/Ship5 ROM 정정
+    analysis_G_*.md            함선 record 구조 확정 (kogyo / lhull)
 .github/workflows/release.yml  태그/dispatch 시 .exe 빌드 → Release
 build.bat / build.ps1        로컬 빌드 스크립트
 LICENSE                      MIT
@@ -200,6 +216,16 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 ---
 
 ## 버전 히스토리
+
+### v0.3.1 (예정 — 함선 record 구조 발견)
+
+- **함선 record 구조 확정** (analysis_G) — horiedit.h 의 ship4_addr (0x5291)
+  가 off-by-2 였음을 발견. 실제 record 시작은 0x528F (슬롯) / 0x0407D8
+  (MAIN.EXE), 12 byte × 25 구조. 첫 두 byte 는 [요구공업치][최대내구도]
+  로 horiedit 가 다루지 않던 영역.
+- **선박 탭 / 원래 함선 정보** 폼에 등장공업치 + 최대 내구도 항목 추가.
+  이전 추정 위치 (0x424AE / 0x4252A / 0x42722 / 0x06FEB) 들은 모두 폐기.
+- **게임 설정 탭** 의 등장공업치 sub-tab 제거 (위치가 잘못되었음).
 
 ### v0.3.0 (2026-05-10 — GUI 전환 완료)
 

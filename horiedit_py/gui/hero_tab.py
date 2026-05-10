@@ -1,10 +1,19 @@
-"""주인공 능력치 편집 탭."""
+"""주인공 능력치 편집 탭.
+
+dirty/commit/revert 인터페이스 제공:
+- reload(): 디스크 → 폼, dirty=False
+- reset(): 폼 비우기/비활성, dirty=False
+- is_dirty(): 변경 여부
+- commit(): 폼 → 디스크 (실패 시 ValueError), dirty=False
+- revert(): reload 의 alias
+- add_dirty_listener(cb): dirty 변경 시 호출되는 콜백 등록
+"""
 
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import messagebox, ttk
-from typing import Optional
+from tkinter import ttk
+from typing import Callable, Optional
 
 from horiedit_py.common import (
     AAL,
@@ -33,7 +42,7 @@ _FAVOR_LABELS = [
 
 
 class HeroTab(ttk.Frame):
-    """주인공 능력치 / 자금 / 작위 / 친밀도 편집 탭 (full functional)."""
+    """주인공 능력치 / 자금 / 작위 / 친밀도 편집 탭."""
 
     def __init__(self, master: tk.Misc, state: EditorState) -> None:
         super().__init__(master, padding=12)
@@ -41,6 +50,9 @@ class HeroTab(ttk.Frame):
         self._hero_idx = 0
         self._loaded = False
         self._slot_loaded = False
+        self._loading = False  # reload 중 trace 콜백 무시 가드
+        self._dirty = False
+        self._dirty_listeners: list[Callable[[], None]] = []
 
         # 위젯 변수
         self._var_hero = tk.StringVar()
@@ -55,6 +67,7 @@ class HeroTab(ttk.Frame):
 
         self._build()
         self._set_inputs_state("disabled")
+        self._install_dirty_traces()
 
     # ---------------- 구성 ----------------
 
@@ -85,6 +98,7 @@ class HeroTab(ttk.Frame):
             misc, textvariable=self._var_peer, state="readonly", width=14
         )
         self._cb_peer.grid(row=1, column=1, sticky="w", padx=4, pady=4)
+        self._cb_peer.bind("<<ComboboxSelected>>", self._on_dirty_event)
 
         # 친밀도
         favor = ttk.LabelFrame(self, text="친밀도 (-100 ~ +100)", padding=8)
@@ -102,16 +116,6 @@ class HeroTab(ttk.Frame):
                 width=6,
             )
             sp.grid(row=0, column=1, padx=(4, 0))
-
-        # 버튼
-        buttons = ttk.Frame(self)
-        buttons.grid(row=3, column=0, columnspan=4, sticky="e", pady=(8, 0))
-        self._btn_reload = ttk.Button(
-            buttons, text="다시 불러오기", command=self._on_reload_clicked
-        )
-        self._btn_reload.grid(row=0, column=0, padx=4)
-        self._btn_save = ttk.Button(buttons, text="저장", command=self._on_save_clicked)
-        self._btn_save.grid(row=0, column=1, padx=4)
 
         # 안내 라벨 (슬롯 미선택 시)
         self._hint = ttk.Label(
@@ -136,39 +140,107 @@ class HeroTab(ttk.Frame):
         sp = ttk.Spinbox(parent, from_=lo, to=hi, textvariable=var, width=width)
         sp.grid(row=row, column=1, sticky="w", padx=4, pady=4)
 
-    # ---------------- 로드 / 저장 ----------------
+    # ---------------- dirty 처리 ----------------
+
+    def _install_dirty_traces(self) -> None:
+        for v in (
+            self._var_trade, self._var_robber, self._var_adven, self._var_money,
+        ):
+            v.trace_add("write", self._on_var_write)
+        for v in self._var_favor.values():
+            v.trace_add("write", self._on_var_write)
+
+    def _on_var_write(self, *_a: object) -> None:
+        if self._loading:
+            return
+        if not self._slot_loaded:
+            return
+        self._set_dirty(True)
+
+    def _on_dirty_event(self, _event: object = None) -> None:
+        if self._loading:
+            return
+        if not self._slot_loaded:
+            return
+        self._set_dirty(True)
+
+    def _set_dirty(self, value: bool) -> None:
+        if self._dirty == value:
+            return
+        self._dirty = value
+        for cb in list(self._dirty_listeners):
+            try:
+                cb()
+            except Exception:
+                pass
+
+    # ---------------- 외부 인터페이스 ----------------
+
+    def is_dirty(self) -> bool:
+        return self._dirty and self._slot_loaded
+
+    def add_dirty_listener(self, callback: Callable[[], None]) -> None:
+        self._dirty_listeners.append(callback)
 
     def reload(self) -> None:
-        """슬롯 변경 또는 외부 갱신 시 호출. 콤보박스/값을 다시 채운다."""
-        names = hero_names(self._state)
-        self._cb_hero.configure(values=names)
+        """디스크 → 폼. dirty=False 로 리셋."""
+        self._loading = True
+        try:
+            names = hero_names(self._state)
+            self._cb_hero.configure(values=names)
 
-        # 활성 영웅 기본 선택
-        active = hero_index_active(self._state)
-        if not (0 <= active < len(names)):
-            active = 0
-        self._hero_idx = active
-        if names:
-            self._var_hero.set(names[active])
+            active = hero_index_active(self._state)
+            if not (0 <= active < len(names)):
+                active = 0
+            self._hero_idx = active
+            if names:
+                self._var_hero.set(names[active])
 
-        self._slot_loaded = True
-        self._hint.grid_remove()
-        self._set_inputs_state("normal")
-        self._load_current_hero()
+            self._slot_loaded = True
+            self._hint.grid_remove()
+            self._set_inputs_state("normal")
+            self._load_current_hero()
+        finally:
+            self._loading = False
+        self._set_dirty(False)
 
     def reset(self) -> None:
-        """슬롯 미선택 상태로 되돌림."""
-        self._slot_loaded = False
-        self._loaded = False
-        self._set_inputs_state("disabled")
-        self._hint.grid()
+        """폼 비우기/비활성. dirty=False."""
+        self._loading = True
+        try:
+            self._slot_loaded = False
+            self._loaded = False
+            self._set_inputs_state("disabled")
+            self._hint.grid()
+        finally:
+            self._loading = False
+        self._set_dirty(False)
+
+    def revert(self) -> None:
+        """reload 와 동일."""
+        self.reload()
+
+    def commit(self) -> None:
+        """현재 폼 → 디스크. 실패 시 ValueError."""
+        if not self._slot_loaded:
+            return
+        if not self._dirty:
+            return
+        data = self._collect_data()
+        try:
+            save_hero(self._state, self._hero_idx, data)
+        except Exception as e:
+            raise ValueError(f"주인공 저장 실패: {e}") from e
+        self._set_dirty(False)
+
+    # ---------------- 로드 ----------------
 
     def _load_current_hero(self) -> None:
+        """_loading=True 컨텍스트 안에서만 호출. textvariable 변경이 dirty 로 잡히지 않도록."""
         try:
             data = load_hero(self._state, self._hero_idx)
         except Exception as e:
-            messagebox.showerror("주인공 로드 실패", str(e))
-            return
+            raise ValueError(f"주인공 로드 실패: {e}") from e
 
         abil = data.abil
         self._var_trade.set(abil.trade)
@@ -182,7 +254,7 @@ class HeroTab(ttk.Frame):
             stored = getattr(abil, key)
             self._var_favor[key].set(int(stored) - 100)
 
-        # 작위 콤보 채우기 (ipeer if c_hero==5(AAL) else epeer)
+        # 작위 콤보 채우기
         peer_list = Ipeer if self._state.c_hero == AAL else Epeer
         self._cb_peer.configure(values=list(peer_list))
         peer_idx = abil.peer if 0 <= abil.peer < len(peer_list) else 0
@@ -191,70 +263,55 @@ class HeroTab(ttk.Frame):
         self._loaded = True
 
     def _on_hero_changed(self, _event: object = None) -> None:
-        if not self._slot_loaded:
+        if self._loading or not self._slot_loaded:
             return
         try:
             idx = list(self._cb_hero["values"]).index(self._var_hero.get())
         except ValueError:
             return
+        if idx == self._hero_idx:
+            return
+        # 다른 hero 로 변경: 자동 dirty 처리 — 기존 변경분은 폐기 (commit 은 app 가 책임).
+        # 새 hero 의 값으로 폼을 다시 채운다.
         self._hero_idx = idx
-        self._load_current_hero()
-
-    def _on_reload_clicked(self) -> None:
-        if not self._slot_loaded:
-            return
-        self._load_current_hero()
-
-    def _on_save_clicked(self) -> None:
-        if not self._slot_loaded:
-            return
-        data = self._collect_data()
-        if data is None:
-            return
+        self._loading = True
         try:
-            save_hero(self._state, self._hero_idx, data)
-            self._state.fp.flush()
-        except Exception as e:
-            messagebox.showerror("저장 실패", str(e))
-            return
-        messagebox.showinfo("저장 완료", "주인공 데이터를 저장했습니다.")
+            self._load_current_hero()
+        finally:
+            self._loading = False
+        # hero 변경 자체는 dirty 가 아님 (단순 표시 전환).
+        self._set_dirty(False)
 
-    def _collect_data(self) -> Optional[HeroData]:
+    # ---------------- 입력 수집/검증 ----------------
+
+    def _collect_data(self) -> HeroData:
         try:
             trade = int(self._var_trade.get())
             robber = int(self._var_robber.get())
             adven = int(self._var_adven.get())
             money = int(self._var_money.get())
         except (tk.TclError, ValueError):
-            messagebox.showerror("입력 오류", "숫자 필드에 잘못된 값이 있습니다.")
-            return None
+            raise ValueError("주인공: 숫자 필드에 잘못된 값이 있습니다.")
 
         if not _in_range(trade, 0, 65535):
-            messagebox.showerror("입력 오류", "무역 명성은 0..65535 범위여야 합니다.")
-            return None
+            raise ValueError("주인공: 무역 명성은 0..65535 범위여야 합니다.")
         if not _in_range(robber, 0, 65535):
-            messagebox.showerror("입력 오류", "해적 명성은 0..65535 범위여야 합니다.")
-            return None
+            raise ValueError("주인공: 해적 명성은 0..65535 범위여야 합니다.")
         if not _in_range(adven, 0, 65535):
-            messagebox.showerror("입력 오류", "모험 명성은 0..65535 범위여야 합니다.")
-            return None
+            raise ValueError("주인공: 모험 명성은 0..65535 범위여야 합니다.")
         if not _in_range(money, 0, 0xFFFFFFFF):
-            messagebox.showerror("입력 오류", "자금은 0..4294967295 범위여야 합니다.")
-            return None
+            raise ValueError("주인공: 자금은 0..4294967295 범위여야 합니다.")
 
         favor_stored: dict[str, int] = {}
         for label, key in _FAVOR_LABELS:
             try:
                 v = int(self._var_favor[key].get())
             except (tk.TclError, ValueError):
-                messagebox.showerror("입력 오류", f"친밀도({label}) 값이 숫자가 아닙니다.")
-                return None
+                raise ValueError(f"주인공: 친밀도({label}) 값이 숫자가 아닙니다.")
             if not _in_range(v, -100, 100):
-                messagebox.showerror(
-                    "입력 오류",
-                    f"친밀도({label}) 는 -100..+100 범위여야 합니다.",
+                raise ValueError(
+                    f"주인공: 친밀도({label}) 는 -100..+100 범위여야 합니다."
                 )
-                return None
             favor_stored[key] = v + 100  # 저장 형식 0..200
 
         peer_list = Ipeer if self._state.c_hero == AAL else Epeer
@@ -262,8 +319,7 @@ class HeroTab(ttk.Frame):
         try:
             peer_idx = list(peer_list).index(peer_text)
         except ValueError:
-            messagebox.showerror("입력 오류", "작위를 선택하세요.")
-            return None
+            raise ValueError("주인공: 작위를 선택하세요.")
 
         abil = Abil(
             trade=trade,
@@ -280,16 +336,15 @@ class HeroTab(ttk.Frame):
         )
         return HeroData(abil=abil, money=money)
 
+    # ---------------- 위젯 활성화 ----------------
+
     def _set_inputs_state(self, st: str) -> None:
-        """입력 위젯 일괄 활성/비활성. ttk 에서는 'normal'/'disabled'."""
-        # readonly 콤보는 'readonly' 로 되돌려야 한다.
         combo_state = "readonly" if st == "normal" else "disabled"
         try:
             self._cb_hero.configure(state=combo_state)
             self._cb_peer.configure(state=combo_state)
         except tk.TclError:
             pass
-        # 나머지 위젯은 자식 트리 순회해서 'normal'/'disabled' 로
         for child in self.winfo_children():
             self._cascade_state(child, st, combo_state)
 

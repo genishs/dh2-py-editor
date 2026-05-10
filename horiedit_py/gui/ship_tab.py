@@ -1,15 +1,19 @@
 """선박 편집 탭.
 
 내부 sub-Notebook 으로 두 영역 분리:
-1) 영웅 함대 편집  (HORIEDIT.C hero_ship_edit 대응)
-2) 함선 종류(오리지널 템플릿) 편집  (HORIEDIT.C org_ship_edit 대응)
+1) 나의 함대 — 현재 c_hero 가 보유한 함대 편집
+2) 원래 함선 정보 — 슬롯 내 25종 함선 템플릿 + (추정) MAIN.EXE lhull
+
+dirty/commit/revert 인터페이스 통합:
+- ShipTab 자체가 EditorTab 역할을 하며, 내부 sub-editor 두 개의 dirty 를
+  OR 로 합치고 add_dirty_listener 로 외부에 전파한다.
 """
 
 from __future__ import annotations
 
 import tkinter as tk
 from tkinter import messagebox, ttk
-from typing import Optional
+from typing import Callable, Optional
 
 from horiedit_py.common import (
     EditorState,
@@ -22,6 +26,15 @@ from horiedit_py.common import (
     encode_kr_fixed,
     form_name,
     weapon_name,
+)
+# 함선 record (analysis_G 확정): record +0 = kogyo, record +1 = lhull.
+# horiedit.h 의 ship4_addr (0x5291) 은 record 의 +2 (lrudder) 부터 시작
+# (off-by-2). 실제 record 시작은 슬롯 +0x528F / MAIN.EXE 0x0407D8.
+from horiedit_py.data.game import (
+    load_record_kogyo,
+    load_record_lhull,
+    save_record_kogyo,
+    save_record_lhull,
 )
 from horiedit_py.data.ship import (
     cargo_recalc,
@@ -41,6 +54,7 @@ class ShipTab(ttk.Frame):
         super().__init__(master, padding=8)
         self._state = state
         self._slot_loaded = False
+        self._dirty_listeners: list[Callable[[], None]] = []
 
         self._notebook = ttk.Notebook(self)
         self._notebook.pack(fill="both", expand=True)
@@ -48,10 +62,14 @@ class ShipTab(ttk.Frame):
         self._fleet = _FleetEditor(self._notebook, state)
         self._org = _OrgShipEditor(self._notebook, state)
 
-        self._notebook.add(self._fleet, text="영웅 함대")
-        self._notebook.add(self._org, text="함선 종류")
+        self._notebook.add(self._fleet, text="나의 함대")
+        self._notebook.add(self._org, text="원래 함선 정보")
 
-    # ---------------- 외부 인터페이스 ----------------
+        # 하위 sub-editor 의 dirty 를 외부로 전파
+        self._fleet.add_dirty_listener(self._on_sub_dirty)
+        self._org.add_dirty_listener(self._on_sub_dirty)
+
+    # ---------------- EditorTab 인터페이스 ----------------
 
     def reload(self) -> None:
         self._slot_loaded = True
@@ -63,9 +81,30 @@ class ShipTab(ttk.Frame):
         self._fleet.reset()
         self._org.reset()
 
+    def revert(self) -> None:
+        self.reload()
+
+    def is_dirty(self) -> bool:
+        return self._fleet.is_dirty() or self._org.is_dirty()
+
+    def commit(self) -> None:
+        # sub-editor 두 개 순차 commit
+        self._fleet.commit()
+        self._org.commit()
+
+    def add_dirty_listener(self, callback: Callable[[], None]) -> None:
+        self._dirty_listeners.append(callback)
+
+    def _on_sub_dirty(self) -> None:
+        for cb in list(self._dirty_listeners):
+            try:
+                cb()
+            except Exception:
+                pass
+
 
 # ===========================================================================
-# 1) 영웅 함대 편집
+# 1) 나의 함대 편집
 # ===========================================================================
 
 
@@ -76,7 +115,10 @@ class _FleetEditor(ttk.Frame):
         super().__init__(master, padding=8)
         self._state = state
         self._slot_loaded = False
-        self._sel: Optional[int] = None  # 현재 선택 fleet 인덱스 (0..ship_num-1)
+        self._sel: Optional[int] = None
+        self._loading = False
+        self._dirty = False
+        self._dirty_listeners: list[Callable[[], None]] = []
 
         # 위젯 변수
         self._var_ccrew = tk.IntVar(value=0)
@@ -94,19 +136,19 @@ class _FleetEditor(ttk.Frame):
         self._var_ship_select = tk.StringVar()
         self._var_ship_name = tk.StringVar()
 
-        # 현재 로드된 구조체 (저장 시 미사용 필드 보존용)
+        # 현재 로드된 구조체
         self._ship1: Optional[Ship1] = None
         self._ship2: Optional[Ship2] = None
         self._ship3: Optional[Ship3] = None
-        self._ship4: Optional[Ship4] = None  # 현재 ship3.ship_select 의 템플릿
+        self._ship4: Optional[Ship4] = None
 
         self._build()
         self._set_form_state("disabled")
+        self._install_dirty_traces()
 
     # ---------------- 빌드 ----------------
 
     def _build(self) -> None:
-        # 슬롯 미선택 안내
         self._hint = ttk.Label(self, text="(슬롯을 먼저 선택하세요)", foreground="#888")
         self._hint.grid(row=0, column=0, columnspan=2, pady=8)
 
@@ -133,7 +175,6 @@ class _FleetEditor(ttk.Frame):
         self._sp_cnowea = self._add_spinbox(right, r, "현재 무기수", self._var_cnowea, 0, 255); r += 1
         self._sp_condition = self._add_spinbox(right, r, "현재 컨디션", self._var_condition, 0, 255); r += 1
 
-        # 카르고 (읽기 전용)
         ttk.Label(right, text="카르고").grid(row=r, column=0, sticky="w", padx=4, pady=4)
         ttk.Label(right, textvariable=self._var_cargo).grid(row=r, column=1, sticky="w", padx=4, pady=4)
         r += 1
@@ -141,46 +182,37 @@ class _FleetEditor(ttk.Frame):
         self._sp_f_crew = self._add_spinbox(right, r, "최대 적재 승무원", self._var_f_crew, 0, 65535); r += 1
         self._sp_f_weap = self._add_spinbox(right, r, "최대 적재 무기수", self._var_f_weap, 0, 255); r += 1
 
-        # 무기 콤보
         ttk.Label(right, text="현재 무기").grid(row=r, column=0, sticky="w", padx=4, pady=4)
         self._cb_cselwea = ttk.Combobox(
             right, textvariable=self._var_cselwea, values=list(weapon_name),
             state="readonly", width=14,
         )
         self._cb_cselwea.grid(row=r, column=1, sticky="w", padx=4, pady=4)
+        self._cb_cselwea.bind("<<ComboboxSelected>>", self._on_dirty_event)
         r += 1
 
-        # 진형 콤보
         ttk.Label(right, text="현재 진형").grid(row=r, column=0, sticky="w", padx=4, pady=4)
         self._cb_form = ttk.Combobox(
             right, textvariable=self._var_form, values=list(form_name),
             state="readonly", width=14,
         )
         self._cb_form.grid(row=r, column=1, sticky="w", padx=4, pady=4)
+        self._cb_form.bind("<<ComboboxSelected>>", self._on_dirty_event)
         r += 1
 
-        # 함선 종류 콤보 (state.ship_name 25개)
         ttk.Label(right, text="현재 함선").grid(row=r, column=0, sticky="w", padx=4, pady=4)
         self._cb_ship_select = ttk.Combobox(
             right, textvariable=self._var_ship_select, values=[],
             state="readonly", width=22,
         )
         self._cb_ship_select.grid(row=r, column=1, sticky="w", padx=4, pady=4)
+        self._cb_ship_select.bind("<<ComboboxSelected>>", self._on_dirty_event)
         r += 1
 
-        # 함선 이름 (Entry)
         ttk.Label(right, text="함선 이름").grid(row=r, column=0, sticky="w", padx=4, pady=4)
         self._en_ship_name = ttk.Entry(right, textvariable=self._var_ship_name, width=22)
         self._en_ship_name.grid(row=r, column=1, sticky="w", padx=4, pady=4)
         r += 1
-
-        # 버튼
-        btns = ttk.Frame(self)
-        btns.grid(row=2, column=0, columnspan=2, sticky="e", pady=(8, 0))
-        self._btn_reload = ttk.Button(btns, text="다시 불러오기", command=self._on_reload_clicked)
-        self._btn_reload.grid(row=0, column=0, padx=4)
-        self._btn_save = ttk.Button(btns, text="저장", command=self._on_save_clicked)
-        self._btn_save.grid(row=0, column=1, padx=4)
 
         self.columnconfigure(1, weight=1)
 
@@ -192,45 +224,112 @@ class _FleetEditor(ttk.Frame):
         sp.grid(row=row, column=1, sticky="w", padx=4, pady=4)
         return sp
 
+    # ---------------- dirty ----------------
+
+    def _install_dirty_traces(self) -> None:
+        for v in (
+            self._var_ccrew, self._var_chull, self._var_lhull, self._var_crudder,
+            self._var_csail, self._var_cnowea, self._var_condition,
+            self._var_f_crew, self._var_f_weap,
+        ):
+            v.trace_add("write", self._on_var_write)
+        self._var_ship_name.trace_add("write", self._on_var_write)
+
+    def _on_var_write(self, *_a: object) -> None:
+        if self._loading:
+            return
+        if not self._slot_loaded or self._sel is None:
+            return
+        self._set_dirty(True)
+
+    def _on_dirty_event(self, _event: object = None) -> None:
+        if self._loading:
+            return
+        if not self._slot_loaded or self._sel is None:
+            return
+        self._set_dirty(True)
+
+    def _set_dirty(self, value: bool) -> None:
+        if self._dirty == value:
+            return
+        self._dirty = value
+        for cb in list(self._dirty_listeners):
+            try:
+                cb()
+            except Exception:
+                pass
+
+    def is_dirty(self) -> bool:
+        return self._dirty and self._slot_loaded and self._sel is not None
+
+    def add_dirty_listener(self, callback: Callable[[], None]) -> None:
+        self._dirty_listeners.append(callback)
+
     # ---------------- reload / reset ----------------
 
     def reload(self) -> None:
-        """슬롯 변경 시 호출. 함대 목록 갱신."""
-        self._slot_loaded = True
-        self._hint.grid_remove()
+        self._loading = True
+        try:
+            self._slot_loaded = True
+            self._hint.grid_remove()
 
-        # 함선 종류 콤보 채우기 (슬롯별 ship_name 캐시 반영)
-        self._cb_ship_select.configure(values=list(self._state.ship_name))
+            self._cb_ship_select.configure(values=list(self._state.ship_name))
+            self._refresh_listbox()
 
-        self._refresh_listbox()
-
-        if self._state.ship_num == 0:
-            # 보유 함선 없음
-            self._listbox.configure(state="disabled")
-            self._set_form_state("disabled")
-            self._show_no_fleet_label()
-            self._sel = None
-            self._ship1 = self._ship2 = self._ship3 = self._ship4 = None
-            return
-
-        self._hide_no_fleet_label()
-        self._listbox.configure(state="normal")
-        # 첫 항목 자동 선택
-        self._listbox.selection_clear(0, "end")
-        self._listbox.selection_set(0)
-        self._listbox.activate(0)
-        self._sel = 0
-        self._load_fleet(0)
+            if self._state.ship_num == 0:
+                self._listbox.configure(state="disabled")
+                self._set_form_state("disabled")
+                self._show_no_fleet_label()
+                self._sel = None
+                self._ship1 = self._ship2 = self._ship3 = self._ship4 = None
+            else:
+                self._hide_no_fleet_label()
+                self._listbox.configure(state="normal")
+                self._listbox.selection_clear(0, "end")
+                self._listbox.selection_set(0)
+                self._listbox.activate(0)
+                self._sel = 0
+                self._load_fleet(0)
+        finally:
+            self._loading = False
+        self._set_dirty(False)
 
     def reset(self) -> None:
-        self._slot_loaded = False
-        self._sel = None
-        self._ship1 = self._ship2 = self._ship3 = self._ship4 = None
-        self._listbox.delete(0, "end")
-        self._listbox.configure(state="normal")
-        self._hide_no_fleet_label()
-        self._set_form_state("disabled")
-        self._hint.grid()
+        self._loading = True
+        try:
+            self._slot_loaded = False
+            self._sel = None
+            self._ship1 = self._ship2 = self._ship3 = self._ship4 = None
+            self._listbox.delete(0, "end")
+            self._listbox.configure(state="normal")
+            self._hide_no_fleet_label()
+            self._set_form_state("disabled")
+            self._hint.grid()
+        finally:
+            self._loading = False
+        self._set_dirty(False)
+
+    def revert(self) -> None:
+        self.reload()
+
+    def commit(self) -> None:
+        if not self._slot_loaded or self._sel is None:
+            return
+        if not self._dirty:
+            return
+        if self._ship1 is None or self._ship2 is None or self._ship3 is None or self._ship4 is None:
+            return
+        self._collect_and_save(self._sel)
+        # 목록 라벨 갱신 (이름/함종 반영)
+        self._loading = True
+        try:
+            self._refresh_listbox()
+            self._listbox.selection_clear(0, "end")
+            self._listbox.selection_set(self._sel)
+            self._listbox.activate(self._sel)
+        finally:
+            self._loading = False
+        self._set_dirty(False)
 
     def _show_no_fleet_label(self) -> None:
         if not hasattr(self, "_no_fleet_lbl"):
@@ -259,7 +358,6 @@ class _FleetEditor(ttk.Frame):
             sname = decode_kr(ship3.ship_name)
             label = f'함선 {i + 1}: <{stype}> "{sname}"'
             self._listbox.insert("end", label)
-            # ship1 참조 회피용 (linter)
             _ = ship1
 
     # ---------------- 폼 채우기 ----------------
@@ -288,26 +386,22 @@ class _FleetEditor(ttk.Frame):
         self._var_f_weap.set(ship3.f_weap)
         self._var_cargo.set(str(ship3.cargo))
 
-        # 무기 콤보: cselwea - 0x10 = weapon_name 인덱스
         wi = ship1.cselwea - 0x10
         if not (0 <= wi < len(weapon_name)):
             wi = 0
         self._var_cselwea.set(weapon_name[wi])
 
-        # 진형
         fi = ship2.ship_form
         if not (0 <= fi < len(form_name)):
             fi = 0
         self._var_form.set(form_name[fi])
 
-        # 함선 종류
         si = ship3.ship_select
         if 0 <= si < len(self._state.ship_name):
             self._var_ship_select.set(self._state.ship_name[si])
         else:
             self._var_ship_select.set("")
 
-        # 함선 이름
         self._var_ship_name.set(decode_kr(ship3.ship_name))
 
         self._set_form_state("normal")
@@ -315,7 +409,7 @@ class _FleetEditor(ttk.Frame):
     # ---------------- 콜백 ----------------
 
     def _on_select(self, _event: object = None) -> None:
-        if not self._slot_loaded:
+        if self._loading or not self._slot_loaded:
             return
         sel = self._listbox.curselection()
         if not sel:
@@ -323,50 +417,18 @@ class _FleetEditor(ttk.Frame):
         idx = int(sel[0])
         if idx == self._sel:
             return
+        # 다른 함선 선택: 폼 dirty 면 변경분 폐기 (탭 내부 전환은 일상적).
         self._sel = idx
-        self._load_fleet(idx)
-
-    def _on_reload_clicked(self) -> None:
-        if not self._slot_loaded:
-            return
-        # 목록도 새로 그린다 (외부 변경 가능성).
-        cur = self._sel if self._sel is not None else 0
-        self._refresh_listbox()
-        if self._state.ship_num == 0:
-            self._sel = None
-            self._set_form_state("disabled")
-            return
-        if cur >= self._state.ship_num:
-            cur = self._state.ship_num - 1
-        self._listbox.selection_clear(0, "end")
-        self._listbox.selection_set(cur)
-        self._listbox.activate(cur)
-        self._sel = cur
-        self._load_fleet(cur)
-
-    def _on_save_clicked(self) -> None:
-        if not self._slot_loaded or self._sel is None:
-            return
-        if self._ship1 is None or self._ship2 is None or self._ship3 is None or self._ship4 is None:
-            return
-        ok = self._collect_and_save(self._sel)
-        if not ok:
-            return
+        self._loading = True
         try:
-            self._state.fp.flush()
-        except Exception:
-            pass
-        # 목록 갱신 (이름/함종 반영)
-        self._refresh_listbox()
-        self._listbox.selection_clear(0, "end")
-        self._listbox.selection_set(self._sel)
-        self._listbox.activate(self._sel)
-        messagebox.showinfo("저장 완료", "함대 데이터를 저장했습니다.")
+            self._load_fleet(idx)
+        finally:
+            self._loading = False
+        self._set_dirty(False)
 
     # ---------------- 저장 로직 ----------------
 
-    def _collect_and_save(self, sel: int) -> bool:
-        # 위젯 값 수집
+    def _collect_and_save(self, sel: int) -> None:
         try:
             ccrew = int(self._var_ccrew.get())
             chull = int(self._var_chull.get())
@@ -378,10 +440,8 @@ class _FleetEditor(ttk.Frame):
             f_crew = int(self._var_f_crew.get())
             f_weap = int(self._var_f_weap.get())
         except (tk.TclError, ValueError):
-            messagebox.showerror("입력 오류", "숫자 필드에 잘못된 값이 있습니다.")
-            return False
+            raise ValueError("나의 함대: 숫자 필드에 잘못된 값이 있습니다.")
 
-        # 범위 검사 (저장 형식의 절대 한계만)
         bounds = [
             ("현재 승무원", ccrew, 0, 0xFFFF),
             ("현재 선체", chull, 0, 0xFF),
@@ -395,35 +455,25 @@ class _FleetEditor(ttk.Frame):
         ]
         for name, v, lo, hi in bounds:
             if not (lo <= v <= hi):
-                messagebox.showerror(
-                    "입력 오류", f"{name} 은 {lo}..{hi} 범위여야 합니다."
-                )
-                return False
+                raise ValueError(f"나의 함대: {name} 은 {lo}..{hi} 범위여야 합니다.")
 
-        # 콤보 인덱스
         try:
             wi = list(weapon_name).index(self._var_cselwea.get())
         except ValueError:
-            messagebox.showerror("입력 오류", "현재 무기를 선택하세요.")
-            return False
+            raise ValueError("나의 함대: 현재 무기를 선택하세요.")
         try:
             fi = list(form_name).index(self._var_form.get())
         except ValueError:
-            messagebox.showerror("입력 오류", "현재 진형을 선택하세요.")
-            return False
+            raise ValueError("나의 함대: 현재 진형을 선택하세요.")
         try:
             si = list(self._state.ship_name).index(self._var_ship_select.get())
         except ValueError:
-            messagebox.showerror("입력 오류", "현재 함선(종류)을 선택하세요.")
-            return False
+            raise ValueError("나의 함대: 현재 함선(종류)을 선택하세요.")
         if not (0 <= si < 25):
-            messagebox.showerror("입력 오류", "함선 종류 인덱스가 범위를 벗어났습니다.")
-            return False
+            raise ValueError("나의 함대: 함선 종류 인덱스가 범위를 벗어났습니다.")
 
-        # 함선 이름 (14 byte 고정)
         ship_name_raw = encode_kr_fixed(self._var_ship_name.get(), 14)
 
-        # 현재 메모리상의 ship1/2/3 을 복사해 수정 (none[] 필드 보존)
         assert self._ship1 is not None and self._ship2 is not None and self._ship3 is not None
         ship1 = Ship1(
             ccrew=ccrew, chull=chull, lhull=lhull,
@@ -440,72 +490,60 @@ class _FleetEditor(ttk.Frame):
             f_weap=f_weap, f_crew=f_crew, cargo=self._ship3.cargo,
         )
 
-        # 함선 종류 변경 감지 → ship4 / ship5 다시 로드 + bform 합성
         ship_type_changed = (si != self._ship3.ship_select)
         try:
             ship4 = load_ship4(self._state, si)
         except Exception as e:
-            messagebox.showerror("선박 템플릿 로드 실패", str(e))
-            return False
+            raise ValueError(f"나의 함대: 선박 템플릿 로드 실패: {e}")
 
         if ship_type_changed:
             try:
                 ship5 = load_ship5(self._state, si)
             except Exception as e:
-                messagebox.showerror("선박 템플릿(Ship5) 로드 실패", str(e))
-                return False
-            # bform 비트 합성: 상위 4비트=새 함선, 하위 4비트=기존
+                raise ValueError(f"나의 함대: 선박 템플릿(Ship5) 로드 실패: {e}")
             ship3.bform = ((ship5.bform & 0xF0) | (ship3.bform & 0x0F)) & 0xFF
 
-        # 클램프 체인 (case 1~12 의 모든 클램프 일괄 적용)
-        # cnowea: cselwea==0x10 이면 0
+        # 클램프 체인
         if ship1.cselwea == 0x10:
             ship1.cnowea = 0
-        # f_crew ≤ ship4.lcrew*10
         max_crew = (ship4.lcrew & 0xFF) * 10
         if ship3.f_crew > max_crew:
             ship3.f_crew = max_crew
-        # f_weap ≤ ship4.lnowea
         if ship3.f_weap > ship4.lnowea:
             ship3.f_weap = ship4.lnowea
-        # ccrew ≤ f_crew
         if ship1.ccrew > ship3.f_crew:
             ship1.ccrew = ship3.f_crew
-        # chull ≤ lhull
         if ship1.chull > ship1.lhull:
             ship1.chull = ship1.lhull
-        # crudder ≤ ship4.lrudder
         if ship1.crudder > ship4.lrudder:
             ship1.crudder = ship4.lrudder
-        # csail ≤ ship4.lsail
         if ship1.csail > ship4.lsail:
             ship1.csail = ship4.lsail
-        # cnowea ≤ f_weap
         if ship1.cnowea > ship3.f_weap:
             ship1.cnowea = ship3.f_weap
 
-        # cargo 재계산
         cargo_recalc(ship3, ship4.capacity, ship3.f_weap, ship3.f_crew)
 
-        # 디스크 기록
         try:
             save_fleet_entry(self._state, sel, ship1, ship2, ship3)
         except Exception as e:
-            messagebox.showerror("저장 실패", str(e))
-            return False
+            raise ValueError(f"나의 함대: 저장 실패: {e}")
 
-        # 메모리 갱신
         self._ship1, self._ship2, self._ship3, self._ship4 = ship1, ship2, ship3, ship4
-        # 폼 클램프 결과 다시 표시
-        self._var_ccrew.set(ship1.ccrew)
-        self._var_chull.set(ship1.chull)
-        self._var_crudder.set(ship1.crudder)
-        self._var_csail.set(ship1.csail)
-        self._var_cnowea.set(ship1.cnowea)
-        self._var_f_crew.set(ship3.f_crew)
-        self._var_f_weap.set(ship3.f_weap)
-        self._var_cargo.set(str(ship3.cargo))
-        return True
+        # 클램프 결과 다시 표시 (loading 가드 내부에서)
+        prev_loading = self._loading
+        self._loading = True
+        try:
+            self._var_ccrew.set(ship1.ccrew)
+            self._var_chull.set(ship1.chull)
+            self._var_crudder.set(ship1.crudder)
+            self._var_csail.set(ship1.csail)
+            self._var_cnowea.set(ship1.cnowea)
+            self._var_f_crew.set(ship3.f_crew)
+            self._var_f_weap.set(ship3.f_weap)
+            self._var_cargo.set(str(ship3.cargo))
+        finally:
+            self._loading = prev_loading
 
     # ---------------- 위젯 활성화 ----------------
 
@@ -515,7 +553,6 @@ class _FleetEditor(ttk.Frame):
             self._sp_ccrew, self._sp_chull, self._sp_lhull, self._sp_crudder,
             self._sp_csail, self._sp_cnowea, self._sp_condition,
             self._sp_f_crew, self._sp_f_weap, self._en_ship_name,
-            self._btn_reload, self._btn_save,
         )
         for w in widgets:
             try:
@@ -530,32 +567,52 @@ class _FleetEditor(ttk.Frame):
 
 
 # ===========================================================================
-# 2) 함선 종류(오리지널 템플릿) 편집
+# 2) 원래 함선 정보 (오리지널 템플릿) 편집 — Ship4 + Ship5 + record kogyo/lhull
 # ===========================================================================
 
 
 class _OrgShipEditor(ttk.Frame):
-    """슬롯 내 25종 함선 템플릿(Ship4 + Ship5) 편집."""
+    """슬롯 내 25종 함선 템플릿 편집.
+
+    편집 대상:
+      - Ship5 (슬롯 내) : 배이름
+      - Ship4 (슬롯 내) : lsail / lrudder / capacity / lcrew / dcrew / lnowea
+      - record (슬롯 내, analysis_G) : +0 kogyo (×10 표시) / +1 lhull (u8 직접)
+
+    record 는 Ship4 와 동일 영역 (record +2 ~ +13) 을 공유하면서 첫 두 byte
+    [kogyo, lhull] 만 추가로 노출한다.
+    """
 
     def __init__(self, master: tk.Misc, state: EditorState) -> None:
         super().__init__(master, padding=8)
         self._state = state
         self._slot_loaded = False
-        self._sel: Optional[int] = None  # 현재 선택 함선 종류 (0..24)
+        self._sel: Optional[int] = None
+        self._loading = False
+        self._dirty = False
+        self._dirty_listeners: list[Callable[[], None]] = []
 
+        # 위젯 변수 (Ship4 / Ship5 in slot + record kogyo/lhull)
         self._var_name = tk.StringVar()
         self._var_lsail = tk.IntVar(value=0)
         self._var_lrudder = tk.IntVar(value=0)
+        self._var_kogyo = tk.IntVar(value=0)   # 표시값 (저장값 × 10)
+        self._var_lhull = tk.IntVar(value=0)   # u8 직접
         self._var_capacity = tk.IntVar(value=0)
-        self._var_lcrew = tk.IntVar(value=0)   # 표시는 *10 (실제 최대치)
+        self._var_lcrew = tk.IntVar(value=0)
         self._var_dcrew = tk.IntVar(value=0)
         self._var_lnowea = tk.IntVar(value=0)
+
+        # 디스크에서 마지막으로 읽은 record 값 (commit 시 변경 비교용)
+        self._loaded_kogyo: int = 0
+        self._loaded_lhull: int = 0
 
         self._ship4: Optional[Ship4] = None
         self._ship5: Optional[Ship5] = None
 
         self._build()
         self._set_form_state("disabled")
+        self._install_dirty_traces()
 
     # ---------------- 빌드 ----------------
 
@@ -574,7 +631,7 @@ class _OrgShipEditor(ttk.Frame):
         self._listbox.bind("<<ListboxSelect>>", self._on_select)
 
         # 우: 폼
-        right = ttk.LabelFrame(self, text="템플릿 정보", padding=8)
+        right = ttk.LabelFrame(self, text="원래 함선 정보", padding=8)
         right.grid(row=1, column=1, sticky="nsew")
 
         r = 0
@@ -582,20 +639,19 @@ class _OrgShipEditor(ttk.Frame):
         self._en_name = ttk.Entry(right, textvariable=self._var_name, width=24)
         self._en_name.grid(row=r, column=1, sticky="w", padx=4, pady=4); r += 1
 
-        self._sp_lsail = self._add_spinbox(right, r, "추진력 (최대 돛)", self._var_lsail, 0, 255); r += 1
-        self._sp_lrudder = self._add_spinbox(right, r, "선회력 (최대 회전력)", self._var_lrudder, 0, 255); r += 1
+        self._sp_lsail = self._add_spinbox(right, r, "추진력 (lsail)", self._var_lsail, 0, 255); r += 1
+        self._sp_lrudder = self._add_spinbox(right, r, "선회력 (lrudder)", self._var_lrudder, 0, 255); r += 1
+
+        # 등장공업치 (kogyo) — record +0. 표시값 = 저장값 × 10.
+        # 입력은 표시값 직접. 저장 시 // 10 후 u8 (0..255) 로 클램프.
+        self._sp_kogyo = self._add_spinbox(right, r, "등장공업치", self._var_kogyo, 0, 2550); r += 1
+        # 최대 내구도 (lhull) — record +1. u8 직접.
+        self._sp_lhull = self._add_spinbox(right, r, "최대 내구도", self._var_lhull, 0, 255); r += 1
+
         self._sp_capacity = self._add_spinbox(right, r, "최대 적재량", self._var_capacity, 0, 65535); r += 1
         self._sp_lcrew = self._add_spinbox(right, r, "최대 승무원", self._var_lcrew, 0, 2550); r += 1
         self._sp_dcrew = self._add_spinbox(right, r, "필요 승무원", self._var_dcrew, 0, 255); r += 1
         self._sp_lnowea = self._add_spinbox(right, r, "최대 무기수", self._var_lnowea, 0, 255); r += 1
-
-        # 버튼
-        btns = ttk.Frame(self)
-        btns.grid(row=2, column=0, columnspan=2, sticky="e", pady=(8, 0))
-        self._btn_reload = ttk.Button(btns, text="다시 불러오기", command=self._on_reload_clicked)
-        self._btn_reload.grid(row=0, column=0, padx=4)
-        self._btn_save = ttk.Button(btns, text="저장", command=self._on_save_clicked)
-        self._btn_save.grid(row=0, column=1, padx=4)
 
         self.columnconfigure(1, weight=1)
 
@@ -607,26 +663,91 @@ class _OrgShipEditor(ttk.Frame):
         sp.grid(row=row, column=1, sticky="w", padx=4, pady=4)
         return sp
 
+    # ---------------- dirty ----------------
+
+    def _install_dirty_traces(self) -> None:
+        for v in (
+            self._var_lsail, self._var_lrudder,
+            self._var_kogyo, self._var_lhull,
+            self._var_capacity,
+            self._var_lcrew, self._var_dcrew, self._var_lnowea,
+        ):
+            v.trace_add("write", self._on_var_write)
+        self._var_name.trace_add("write", self._on_var_write)
+
+    def _on_var_write(self, *_a: object) -> None:
+        if self._loading:
+            return
+        if not self._slot_loaded or self._sel is None:
+            return
+        self._set_dirty(True)
+
+    def _set_dirty(self, value: bool) -> None:
+        if self._dirty == value:
+            return
+        self._dirty = value
+        for cb in list(self._dirty_listeners):
+            try:
+                cb()
+            except Exception:
+                pass
+
+    def is_dirty(self) -> bool:
+        return self._dirty and self._slot_loaded and self._sel is not None
+
+    def add_dirty_listener(self, callback: Callable[[], None]) -> None:
+        self._dirty_listeners.append(callback)
+
     # ---------------- reload / reset ----------------
 
     def reload(self) -> None:
-        self._slot_loaded = True
-        self._hint.grid_remove()
-        self._refresh_listbox()
-        # 첫 항목 선택
-        self._listbox.selection_clear(0, "end")
-        self._listbox.selection_set(0)
-        self._listbox.activate(0)
-        self._sel = 0
-        self._load_template(0)
+        self._loading = True
+        try:
+            self._slot_loaded = True
+            self._hint.grid_remove()
+            self._refresh_listbox()
+            self._listbox.selection_clear(0, "end")
+            self._listbox.selection_set(0)
+            self._listbox.activate(0)
+            self._sel = 0
+            self._load_template(0)
+        finally:
+            self._loading = False
+        self._set_dirty(False)
 
     def reset(self) -> None:
-        self._slot_loaded = False
-        self._sel = None
-        self._ship4 = self._ship5 = None
-        self._listbox.delete(0, "end")
-        self._set_form_state("disabled")
-        self._hint.grid()
+        self._loading = True
+        try:
+            self._slot_loaded = False
+            self._sel = None
+            self._ship4 = self._ship5 = None
+            self._listbox.delete(0, "end")
+            self._set_form_state("disabled")
+            self._hint.grid()
+        finally:
+            self._loading = False
+        self._set_dirty(False)
+
+    def revert(self) -> None:
+        self.reload()
+
+    def commit(self) -> None:
+        if not self._slot_loaded or self._sel is None:
+            return
+        if not self._dirty:
+            return
+        if self._ship4 is None or self._ship5 is None:
+            return
+        self._collect_and_save(self._sel)
+        self._loading = True
+        try:
+            self._refresh_listbox()
+            self._listbox.selection_clear(0, "end")
+            self._listbox.selection_set(self._sel)
+            self._listbox.activate(self._sel)
+        finally:
+            self._loading = False
+        self._set_dirty(False)
 
     def _refresh_listbox(self) -> None:
         self._listbox.delete(0, "end")
@@ -646,9 +767,21 @@ class _OrgShipEditor(ttk.Frame):
         self._ship4 = ship4
         self._ship5 = ship5
 
+        # record (analysis_G): +0 = kogyo (×10 표시), +1 = lhull (u8).
+        try:
+            kogyo_stored = load_record_kogyo(self._state, sel)
+            lhull_val = load_record_lhull(self._state, sel)
+        except Exception as e:
+            messagebox.showerror("템플릿 로드 실패", f"record 읽기 실패: {e}")
+            return
+        self._loaded_kogyo = kogyo_stored
+        self._loaded_lhull = lhull_val
+
         self._var_name.set(decode_kr(ship5.name))
         self._var_lsail.set(ship4.lsail)
         self._var_lrudder.set(ship4.lrudder)
+        self._var_kogyo.set(kogyo_stored * 10)
+        self._var_lhull.set(lhull_val)
         self._var_capacity.set(ship4.capacity)
         self._var_lcrew.set((ship4.lcrew & 0xFF) * 10)
         self._var_dcrew.set(ship4.dcrew)
@@ -659,7 +792,7 @@ class _OrgShipEditor(ttk.Frame):
     # ---------------- 콜백 ----------------
 
     def _on_select(self, _event: object = None) -> None:
-        if not self._slot_loaded:
+        if self._loading or not self._slot_loaded:
             return
         sel = self._listbox.curselection()
         if not sel:
@@ -668,47 +801,33 @@ class _OrgShipEditor(ttk.Frame):
         if idx == self._sel:
             return
         self._sel = idx
-        self._load_template(idx)
-
-    def _on_reload_clicked(self) -> None:
-        if not self._slot_loaded or self._sel is None:
-            return
-        self._load_template(self._sel)
-
-    def _on_save_clicked(self) -> None:
-        if not self._slot_loaded or self._sel is None:
-            return
-        if self._ship4 is None or self._ship5 is None:
-            return
-        if self._collect_and_save(self._sel):
-            try:
-                self._state.fp.flush()
-            except Exception:
-                pass
-            # 목록 라벨 갱신 (이름 변경 반영)
-            self._refresh_listbox()
-            self._listbox.selection_clear(0, "end")
-            self._listbox.selection_set(self._sel)
-            self._listbox.activate(self._sel)
-            messagebox.showinfo("저장 완료", "함선 템플릿을 저장했습니다.")
+        self._loading = True
+        try:
+            self._load_template(idx)
+        finally:
+            self._loading = False
+        self._set_dirty(False)
 
     # ---------------- 저장 ----------------
 
-    def _collect_and_save(self, sel: int) -> bool:
+    def _collect_and_save(self, sel: int) -> None:
         try:
             lsail = int(self._var_lsail.get())
             lrudder = int(self._var_lrudder.get())
+            kogyo_disp = int(self._var_kogyo.get())
+            lhull_val = int(self._var_lhull.get())
             capacity = int(self._var_capacity.get())
             lcrew_x10 = int(self._var_lcrew.get())
             dcrew = int(self._var_dcrew.get())
             lnowea = int(self._var_lnowea.get())
         except (tk.TclError, ValueError):
-            messagebox.showerror("입력 오류", "숫자 필드에 잘못된 값이 있습니다.")
-            return False
+            raise ValueError("원래 함선 정보: 숫자 필드에 잘못된 값이 있습니다.")
 
         bounds = [
             ("추진력", lsail, 0, 0xFF),
             ("선회력", lrudder, 0, 0xFF),
+            ("등장공업치", kogyo_disp, 0, 2550),
+            ("최대 내구도", lhull_val, 0, 0xFF),
             ("최대 적재량", capacity, 0, 0xFFFF),
             ("최대 승무원", lcrew_x10, 0, 2550),
             ("필요 승무원", dcrew, 0, 0xFF),
@@ -716,18 +835,13 @@ class _OrgShipEditor(ttk.Frame):
         ]
         for name, v, lo, hi in bounds:
             if not (lo <= v <= hi):
-                messagebox.showerror(
-                    "입력 오류", f"{name} 은 {lo}..{hi} 범위여야 합니다."
-                )
-                return False
+                raise ValueError(f"원래 함선 정보: {name} 은 {lo}..{hi} 범위여야 합니다.")
 
-        # 변경 감지 (한도 변경 시 영웅 함대 클램프 전파를 위해)
         old4 = self._ship4
         old5 = self._ship5
         assert old4 is not None and old5 is not None
 
-        new_lcrew = lcrew_x10 // 10  # 저장값
-        new_lcrew_max = (new_lcrew & 0xFF) * 10  # 비교/클램프용 실제 최대치
+        new_lcrew = lcrew_x10 // 10
 
         new_ship4 = Ship4(
             lrudder=lrudder, lsail=lsail,
@@ -736,33 +850,46 @@ class _OrgShipEditor(ttk.Frame):
             none=old4.none,
         )
 
-        # 배 이름 (Ship5.name 18 byte)
         name_raw = encode_kr_fixed(self._var_name.get(), 18)
         new_ship5 = Ship5(
             name=name_raw, sform=old5.sform, bform=old5.bform, none=old5.none,
         )
 
-        # 변경 플래그
+        # 변경 플래그 + 클램프 전파에 사용할 값
+        new_lcrew_max = (new_lcrew & 0xFF) * 10
         changed_lrudder = (new_ship4.lrudder != old4.lrudder)
         changed_lsail = (new_ship4.lsail != old4.lsail)
         changed_lcrew = (new_ship4.lcrew != old4.lcrew)
         changed_capacity = (new_ship4.capacity != old4.capacity)
         changed_lnowea = (new_ship4.lnowea != old4.lnowea)
 
-        # 디스크 기록 — Ship4, Ship5 먼저
         try:
             save_ship4(self._state, sel, new_ship4)
             save_ship5(self._state, sel, new_ship5)
         except Exception as e:
-            messagebox.showerror("저장 실패", str(e))
-            return False
+            raise ValueError(f"원래 함선 정보: 저장 실패: {e}")
 
-        # ship_name 캐시 동기화 (org_ship_edit case 7 — 이름 변경 시 항상)
+        # record (analysis_G): +0 kogyo (×10 표시→//10 저장), +1 lhull.
+        # 변경된 byte 만 부분 갱신 (Ship4 와는 별개 영역인 +0/+1 만 건드림).
+        new_kogyo_stored = (kogyo_disp // 10) & 0xFF
+        if new_kogyo_stored != self._loaded_kogyo:
+            try:
+                save_record_kogyo(self._state, sel, new_kogyo_stored)
+            except Exception as e:
+                raise ValueError(f"원래 함선 정보: 등장공업치 저장 실패: {e}")
+            self._loaded_kogyo = new_kogyo_stored
+        if (lhull_val & 0xFF) != self._loaded_lhull:
+            try:
+                save_record_lhull(self._state, sel, lhull_val)
+            except Exception as e:
+                raise ValueError(f"원래 함선 정보: 최대 내구도 저장 실패: {e}")
+            self._loaded_lhull = lhull_val & 0xFF
+
         new_name_str = decode_kr(new_ship5.name)
         if 0 <= sel < len(self._state.ship_name):
             self._state.ship_name[sel] = new_name_str
 
-        # 영웅 함대 클램프 전파 (한도 또는 capacity 변경 시 그 종류를 사용 중인 모든 함대)
+        # 영웅 함대 클램프 전파
         any_lim_changed = (
             changed_lrudder or changed_lsail or changed_lcrew
             or changed_capacity or changed_lnowea
@@ -792,8 +919,6 @@ class _OrgShipEditor(ttk.Frame):
                     if s1.cnowea > s3.f_weap:
                         s1.cnowea = s3.f_weap
                     touched = True
-                # capacity 변경: 무조건 cargo 재계산
-                # 또는 위 클램프로 f_weap/f_crew 가 변했으면 cargo 재계산
                 if changed_capacity or touched:
                     cargo_recalc(s3, new_ship4.capacity, s3.f_weap, s3.f_crew)
                     touched = True
@@ -803,18 +928,26 @@ class _OrgShipEditor(ttk.Frame):
                     except Exception:
                         pass
 
-        # 메모리 갱신
         self._ship4 = new_ship4
         self._ship5 = new_ship5
-        return True
+
+        # 사용자가 //10 클램프 (예: 105 → 100) 후 표시값 (1000) 으로 다시 보이도록
+        # 폼을 갱신. loading 가드 내에서 수행해 dirty 재발화 방지.
+        prev_loading = self._loading
+        self._loading = True
+        try:
+            self._var_kogyo.set(self._loaded_kogyo * 10)
+            self._var_lhull.set(self._loaded_lhull)
+        finally:
+            self._loading = prev_loading
 
     # ---------------- 위젯 활성화 ----------------
 
     def _set_form_state(self, st: str) -> None:
         widgets = (
             self._en_name, self._sp_lsail, self._sp_lrudder,
+            self._sp_kogyo, self._sp_lhull,
             self._sp_capacity, self._sp_lcrew, self._sp_dcrew, self._sp_lnowea,
-            self._btn_reload, self._btn_save,
         )
         for w in widgets:
             try:

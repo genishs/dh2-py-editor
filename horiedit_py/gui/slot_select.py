@@ -1,4 +1,9 @@
-"""상단 슬롯 선택 위젯."""
+"""상단 슬롯 선택 위젯 (라디오) + 별도 정보 패널.
+
+라디오 클릭은 즉시 select_slot 을 호출하지 않고 on_slot_request 콜백으로
+app.py 에 위임한다. 따라서 app 가 dirty 검사 / 다이얼로그를 처리한 뒤
+필요 시 set_active_slot() 으로 라디오를 이전 값으로 되돌릴 수 있다.
+"""
 
 from __future__ import annotations
 
@@ -7,39 +12,48 @@ from tkinter import ttk
 from typing import Callable, Optional
 
 from horiedit_py.common import EditorState, decode_kr
-from horiedit_py.data import select_slot, slot_init, slot_is_used
+from horiedit_py.data import slot_init, slot_is_used
 
 
 SLOT_COUNT = 10
 
 
-class SlotSelectFrame(ttk.LabelFrame):
-    """10개 세이브 슬롯을 라디오버튼으로 선택하는 상단 위젯."""
+class SlotSelectFrame(ttk.Frame):
+    """10개 세이브 슬롯 라디오 + 선택 슬롯 상세 정보 패널."""
 
     def __init__(
         self,
         master: tk.Misc,
         state: EditorState,
-        on_slot_changed: Callable[[int], None],
-        on_quit: Callable[[], None],
+        on_slot_request: Callable[[int], None],
     ) -> None:
-        super().__init__(master, text="세이브 슬롯", padding=8)
+        super().__init__(master)
         self._state = state
-        self._on_slot_changed = on_slot_changed
-        self._on_quit = on_quit
+        self._on_slot_request = on_slot_request
+        # _var: 현재 라디오에 표시되는 값. set_active_slot 으로 직접 갱신할 때
+        # _on_radio_clicked 가 호출되지 않도록 _suppress 플래그 사용.
         self._var = tk.IntVar(value=-1)
+        self._suppress = False
         self._radios: list[ttk.Radiobutton] = []
+
         self._build()
-        self.refresh()
+        self.refresh_list()
+
+    # ---------------- UI 구성 ----------------
 
     def _build(self) -> None:
-        # 라디오버튼은 2줄 x 5칸으로 배치.
-        grid = ttk.Frame(self)
-        grid.grid(row=0, column=0, sticky="nsew")
+        self.columnconfigure(0, weight=1)
+        self.columnconfigure(1, weight=1)
+
+        # 좌측: 슬롯 라디오 박스
+        slots = ttk.LabelFrame(self, text="세이브 슬롯", padding=8)
+        slots.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
+
+        # 2 x 5 배치
         for i in range(SLOT_COUNT):
             r, c = divmod(i, 5)
             rb = ttk.Radiobutton(
-                grid,
+                slots,
                 text=f"{i + 1}) (없음)",
                 value=i,
                 variable=self._var,
@@ -48,18 +62,27 @@ class SlotSelectFrame(ttk.LabelFrame):
             rb.grid(row=r, column=c, sticky="w", padx=4, pady=2)
             self._radios.append(rb)
 
-        # 우측 종료 버튼
-        side = ttk.Frame(self)
-        side.grid(row=0, column=1, sticky="ne", padx=8)
-        ttk.Button(side, text="프로그램 종료", command=self._on_quit).grid(
-            row=0, column=0, sticky="ne"
-        )
+        # 우측: 선택한 슬롯 상세
+        detail = ttk.LabelFrame(self, text="선택한 슬롯", padding=8)
+        detail.grid(row=0, column=1, sticky="nsew", padx=(4, 0))
 
-        self.columnconfigure(0, weight=1)
-        self.columnconfigure(1, weight=0)
+        ttk.Label(detail, text="메모:").grid(row=0, column=0, sticky="w", padx=4, pady=2)
+        ttk.Label(detail, text="항구:").grid(row=1, column=0, sticky="w", padx=4, pady=2)
+        ttk.Label(detail, text="주인공:").grid(row=2, column=0, sticky="w", padx=4, pady=2)
 
-    def refresh(self) -> None:
-        """파일에서 다시 슬롯 메타를 읽어 라벨 갱신."""
+        self._lbl_memo = ttk.Label(detail, text="(미선택)")
+        self._lbl_memo.grid(row=0, column=1, sticky="w", padx=4, pady=2)
+        self._lbl_port = ttk.Label(detail, text="-")
+        self._lbl_port.grid(row=1, column=1, sticky="w", padx=4, pady=2)
+        self._lbl_hero = ttk.Label(detail, text="-")
+        self._lbl_hero.grid(row=2, column=1, sticky="w", padx=4, pady=2)
+
+        detail.columnconfigure(1, weight=1)
+
+    # ---------------- 라벨 갱신 ----------------
+
+    def refresh_list(self) -> None:
+        """모든 라디오 라벨 재계산. 데이터 없는 슬롯은 비활성."""
         for i in range(SLOT_COUNT):
             label = self._slot_label(i)
             used = slot_is_used(self._state, i)
@@ -76,42 +99,52 @@ class SlotSelectFrame(ttk.LabelFrame):
         if init.memo[0] == 0:
             return f"{idx + 1}) 데이터 없음"
         memo = decode_kr(init.memo).strip()
-        # 항구 이름은 슬롯이 로드되어야 캐시되므로 여기서는 메모만.
         return f"{idx + 1}) {memo}"
 
+    def refresh_detail(self, state: EditorState, idx: Optional[int]) -> None:
+        """우측 상세 패널 갱신. idx=None 이면 미선택 표시."""
+        if idx is None:
+            self._lbl_memo.configure(text="(미선택)")
+            self._lbl_port.configure(text="-")
+            self._lbl_hero.configure(text="-")
+            return
+        try:
+            init = slot_init(state, idx)
+            memo = decode_kr(init.memo).strip() or "(빈 슬롯)"
+            port_idx = init.port
+            port_name = ""
+            if 0 <= port_idx < len(state.port_name):
+                port_name = state.port_name[port_idx]
+            hero_name = ""
+            c_hero = state.c_hero
+            if 0 <= c_hero < len(state.hero):
+                hero_name = state.hero[c_hero]
+        except Exception as e:
+            self._lbl_memo.configure(text=f"(읽기 오류: {e})")
+            self._lbl_port.configure(text="-")
+            self._lbl_hero.configure(text="-")
+            return
+        self._lbl_memo.configure(text=memo)
+        self._lbl_port.configure(text=port_name or "-")
+        self._lbl_hero.configure(text=hero_name or "-")
+
+    # ---------------- 라디오 동작 ----------------
+
     def _on_radio_clicked(self) -> None:
+        if self._suppress:
+            return
         idx = self._var.get()
         if idx < 0:
             return
-        if not slot_is_used(self._state, idx):
-            return
-        try:
-            select_slot(self._state, idx)
-        except Exception as e:
-            from tkinter import messagebox
-            messagebox.showerror("슬롯 로드 실패", str(e))
-            return
-        # 슬롯이 로드되면 port_name 캐시가 갱신되므로 라벨 다시 한 번 보강 가능.
-        self._update_active_label(idx)
-        self._on_slot_changed(idx)
+        self._on_slot_request(idx)
 
-    def _update_active_label(self, idx: int) -> None:
-        """슬롯 로드 후, 활성 슬롯에 항구·주인공 이름을 덧붙인다."""
+    def set_active_slot(self, idx: Optional[int]) -> None:
+        """라디오 표시를 강제 변경 (콜백을 발동시키지 않는다)."""
+        self._suppress = True
         try:
-            init = slot_init(self._state, idx)
-            memo = decode_kr(init.memo).strip()
-            port_idx = init.port
-            port_name = ""
-            if 0 <= port_idx < len(self._state.port_name):
-                port_name = self._state.port_name[port_idx]
-            hero_name = ""
-            c_hero = self._state.c_hero
-            if 0 <= c_hero < len(self._state.hero):
-                hero_name = self._state.hero[c_hero]
-            text = f"{idx + 1}) {memo}  *{port_name}  {hero_name}"
-            self._radios[idx].configure(text=text)
-        except Exception:
-            pass
+            self._var.set(idx if idx is not None else -1)
+        finally:
+            self._suppress = False
 
     def selected_index(self) -> Optional[int]:
         v = self._var.get()

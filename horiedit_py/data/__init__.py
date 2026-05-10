@@ -1,6 +1,17 @@
 """순수 데이터 액세스 레이어. GUI 가 호출하는 인터페이스.
 
 print/input 절대 사용 금지. 에러는 예외로 전파.
+
+서브 모듈:
+  - hero    : 주인공 능력치/자금
+  - person  : 인물 검색·편집
+  - ship    : 함대(Ship1/2/3) + 함선 템플릿(Ship4/5) 슬롯 내 편집
+  - game    : MAIN.EXE Ship4/5 ROM, 함선 record (analysis_G — kogyo/lhull)
+
+이전에 있던 "등장공업치 표 (KOGYO_OFFSET_IN_SLOT / MAINEXE_KOGYO_TABLE_*)"
+관련 export 는 analysis_G 의 record 구조 발견과 함께 제거되었다. 등장공업치
+와 최대 내구도는 record 의 +0/+1 byte 이며, 헬퍼는 game.py 의
+load/save_record_kogyo / load/save_record_lhull 를 통해 사용한다.
 """
 
 from __future__ import annotations
