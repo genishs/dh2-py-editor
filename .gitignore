@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.python-version
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Claude Code
+.claude/
+
+# 분석 작업 임시 파일
+*.tmp
+
+# PyInstaller 산출물
+build/
+dist/
+*.spec
+
+# 게임 원본/세이브 — 저작권 및 용량 문제로 공개 레포에서 제외
+originalgame/
