@@ -12,6 +12,7 @@ from horiedit_py.common import (
     decode_kr,
     encode_kr_fixed,
 )
+from horiedit_py.game_settings import MAINEXE_LHULL_TABLE
 
 
 def _read_int(prompt: str) -> int:
@@ -35,6 +36,45 @@ def _read_line(prompt: str) -> str:
         return input(prompt)
     except EOFError:
         return ""
+
+
+def _mainexe_path(state: EditorState):
+    """state.game_dir 에서 MAIN.EXE 경로를 얻는다. 없거나 미존재면 None."""
+    if state.game_dir is None:
+        return None
+    p = state.game_dir / "MAIN.EXE"
+    return p if p.exists() else None
+
+
+def _read_lhull_rom(state: EditorState, idx: int):
+    """MAIN.EXE 의 lhull 테이블에서 idx 의 uint16 LE 값. 실패 시 None."""
+    p = _mainexe_path(state)
+    if p is None:
+        return None
+    try:
+        with open(p, "rb") as f:
+            f.seek(MAINEXE_LHULL_TABLE + idx * 2)
+            data = f.read(2)
+            if len(data) != 2:
+                return None
+            return int.from_bytes(data, "little")
+    except OSError:
+        return None
+
+
+def _write_lhull_rom(state: EditorState, idx: int, value: int) -> bool:
+    """MAIN.EXE 의 lhull 테이블 idx 에 uint16 LE 값을 쓴다."""
+    p = _mainexe_path(state)
+    if p is None:
+        return False
+    try:
+        with open(p, "r+b") as f:
+            f.seek(MAINEXE_LHULL_TABLE + idx * 2)
+            f.write((value & 0xFFFF).to_bytes(2, "little"))
+            f.flush()
+        return True
+    except OSError:
+        return False
 
 
 def hero_ship_edit(state: EditorState) -> None:
@@ -287,9 +327,12 @@ def org_ship_edit(state: EditorState) -> None:
                 print(f"5) 최대 적재량 : {ship4.capacity}")
                 print(f"6) 최대 무기수 : {ship4.lnowea}")
                 print(f"7) 배이름      : {decode_kr(ship5.name)}")
+                lhull_val = _read_lhull_rom(state, sel)
+                lhull_disp = str(lhull_val) if lhull_val is not None else "(MAIN.EXE 미발견)"
+                print(f"8) 신조 시 최대 내구도 : {lhull_disp}  [MAIN.EXE - 추정 위치]")
                 print()
                 i = _read_int("고치기를 원하시는 데이터의 번호를 넣어 주세요 => ")
-                if 0 <= i <= 7:
+                if 0 <= i <= 8:
                     break
             if i == 0:
                 break
@@ -360,6 +403,21 @@ def org_ship_edit(state: EditorState) -> None:
                 state.fp.write(ship5.to_bytes())
                 state.fp.flush()
                 state.ship_name[sel] = decode_kr(ship5.name)
+            elif i == 8:
+                # MAIN.EXE 의 lhull 테이블 (추정 위치) 직접 편집.
+                # KOUKAI2.DAT 슬롯이 아닌 게임 실행 데이터를 건드리므로 주의.
+                p = _mainexe_path(state)
+                if p is None:
+                    print("MAIN.EXE 를 찾지 못했습니다. (게임 폴더에서 실행해 주세요)")
+                    continue
+                print()
+                print("[경고] 이 항목은 추정 위치(MAIN.EXE 0x424AE)에 직접 씁니다.")
+                print("       게임 실험으로 검증되지 않았으므로, 이상 동작 시 MAIN.EXE.bak 으로 복구하세요.")
+                imsi = _read_int("신조 시 최대 내구도를 고칩니다 (0..65535). => ")
+                if not _write_lhull_rom(state, sel, imsi):
+                    print(f"MAIN.EXE 쓰기 실패: {p}")
+                else:
+                    print(f"저장됨: MAIN.EXE @ 0x{MAINEXE_LHULL_TABLE + sel * 2:05X} = {imsi & 0xFFFF}")
 
         # 0 입력 시 Ship4 만 fwrite (Ship5 는 case 7 에서 처리됨).
         state.fp.seek(offset4)
