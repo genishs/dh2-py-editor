@@ -137,19 +137,24 @@ cargo 자동 재계산.
 > ⚠️ 리스본 (idx 0) 의 상업치는 페어웰 (idx 129) 의 좌표 영역과 데이터가
 > overlap. 위의 "알려진 주의사항" 참조.
 
-다른 필드 (record 의 +8..+36) 는 분석 진행 중 — 물가 (+14..+23 후보) 는
-별도 버전에서 추가 예정.
+물가에 영향을 주는 공급 수치 (record 의 +14..+23) 는 [게임 설정] 탭의
+"항구 공급 수치 (물가)" sub-tab 에서 편집 가능 (시험 기능).
 
-### 게임 설정 탭
+### 게임 설정 탭 — ⚠️ 시험 기능
 
-`MAIN.EXE` 가 같은 폴더에 있어야 활성. 내부 sub-Notebook 2개:
+분석이 완전치 않거나 가설 단계의 영역을 직접 편집. **게임이 정상 실행되지
+않을 수 있으므로 편집 전 KOUKAI2.DAT 와 MAIN.EXE 백업 필수.**
+
+내부 sub-Notebook 3개:
 
 | Sub-tab | 위치 | 검증 | 편집 항목 |
 |---|---|---|---|
 | **함선 정적 스펙 (Ship4 ROM)** | MAIN.EXE @ 0x0407DA | 확정 | lrudder/lsail/lcrew×10/dcrew/capacity/lnowea |
 | **함선 이름·외형 (Ship5 ROM)** | MAIN.EXE @ 0x040566 | 확정 | name(18B)/sform/bform 상위 4비트 |
+| **항구 공급 수치 (물가)** ([analysis_J](analysis/analysis_J_port_supply.md)) | slot `+0x5DE3 + idx*37 + 14` | 가설 | 10 byte/port — 표준 항구(0..99) ASCII digit/dot 인코딩 |
 
-read-modify-write 시 `none[*]` 패딩 byte 모두 보존.
+read-modify-write 시 `none[*]` 패딩 byte 모두 보존. 항구 공급 수치 sub-tab 은
+slot 만 필요 (MAIN.EXE 없어도 사용 가능).
 
 > 등장공업치(요구공업치) 와 최대 내구도(lhull) 는 함선 record (analysis_G)
 > 의 +0/+1 byte 임이 확정되어, [선박] 탭의 [원래 함선 정보] 에서 편집한다.
@@ -255,6 +260,21 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 ---
 
 ## 버전 히스토리
+
+### v0.4.6 (2026-05-12 — 항구 공급 수치 (물가 영향) 편집 ([#4](https://github.com/genishs/dh2-py-editor/issues/4)) + 타이틀 버전 표시 수정)
+
+- **항구 공급 수치 편집** ([`analysis_J`](analysis/analysis_J_port_supply.md)) —
+  record 의 `+14..+23` 10 byte 는 무역품 슬롯 10개의 공급 수치. 표준 항구
+  (idx 0..99) 는 ASCII digit/dot 인코딩: `'.'` (empty), `'/'` 공급 0,
+  `'0'..'9'` 공급 1..10. 공급이 낮을수록 게임 표시 가격 상승.
+- **시험 기능 분류** — 본 편집은 [게임 설정] 탭의 sub-tab "항구 공급 수치
+  (물가)" 로 추가됨. 가격이 base × supply 로 derived 되는 메커닉이라
+  사용자는 정확한 가격 입력이 아닌 공급 byte 직접 편집. 가격 직접 편집은
+  base price + 공식 역공학 후 별도 분석에서 추가 예정.
+- **시험 기능 경고 강화** — [게임 설정] 탭 상단 경고를 게임 실행 오류 가능성을
+  명시하도록 수정. KOUKAI2.DAT + MAIN.EXE 백업 강조.
+- **타이틀 버전 표시 수정** — 그동안 하드코딩으로 "Ver 0.1" 만 나오던 윈도우
+  타이틀이 실제 릴리스 버전 (`horiedit_py.__version__`) 을 표시.
 
 ### v0.4.5 (2026-05-12 — README 주의사항 정리 + 항구 탭 문서화)
 

@@ -15,6 +15,7 @@ from tkinter import font as tkfont
 from tkinter import messagebox, ttk
 from typing import Optional
 
+from horiedit_py import __version__
 from horiedit_py.common import state
 from horiedit_py.data import select_slot, slot_is_used
 from horiedit_py.gui.hero_tab import HeroTab
@@ -25,7 +26,7 @@ from horiedit_py.gui.ship_tab import ShipTab
 from horiedit_py.gui.slot_select import SlotSelectFrame
 
 
-_TITLE = "대항해시대 II 세이브 에디터  Ver 0.1"
+_TITLE = f"대항해시대 II 세이브 에디터  Ver {__version__}"
 _WIDTH = 980
 _HEIGHT = 700
 

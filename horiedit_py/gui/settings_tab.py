@@ -29,6 +29,13 @@ from horiedit_py.data.game import (
     save_ship4_rom,
     save_ship5_rom,
 )
+from horiedit_py.data.port import (
+    NUM_PORTS,
+    PORT_SUPPLY_SIZE,
+    load_port_supply,
+    port_supply_is_standard,
+    save_port_supply,
+)
 
 
 _HEADER_HINT = (
@@ -73,6 +80,7 @@ class SettingsTab(ttk.Frame):
         self._inner: Optional[ttk.Frame] = None
         self._ship4_panel: Optional[_Ship4Panel] = None
         self._ship5_panel: Optional[_Ship5Panel] = None
+        self._supply_panel: Optional[_PortSupplyPanel] = None
         self._missing_label: Optional[ttk.Label] = None
 
         self._build_initial()
@@ -91,20 +99,22 @@ class SettingsTab(ttk.Frame):
             self._ship4_panel.set_enabled(False)
         if self._ship5_panel is not None:
             self._ship5_panel.set_enabled(False)
+        if self._supply_panel is not None:
+            self._supply_panel.set_enabled(False)
 
     def revert(self) -> None:
         """디스크에서 다시 읽음. reload 와 동일."""
         self.reload()
 
     def is_dirty(self) -> bool:
-        for panel in (self._ship4_panel, self._ship5_panel):
+        for panel in (self._ship4_panel, self._ship5_panel, self._supply_panel):
             if panel is not None and panel.is_dirty():
                 return True
         return False
 
     def commit(self) -> None:
         """모든 sub-panel commit."""
-        for panel in (self._ship4_panel, self._ship5_panel):
+        for panel in (self._ship4_panel, self._ship5_panel, self._supply_panel):
             if panel is None:
                 continue
             try:
@@ -129,8 +139,9 @@ class SettingsTab(ttk.Frame):
         warning = ttk.Label(
             self,
             text=(
-                "⚠️ 시험 기능 — 게임이 정상 실행되지 않을 수 있습니다.\n"
-                "   편집 전 MAIN.EXE 백업 (MAIN.EXE.bak) 을 권장합니다."
+                "⚠️ 시험 기능 — 이 탭의 항목 편집은 게임 실행에 오류를 일으킬 수 있습니다.\n"
+                "   분석이 완전치 않거나 가설 단계의 영역을 직접 편집합니다.\n"
+                "   편집 전 KOUKAI2.DAT 와 MAIN.EXE 백업을 반드시 만들어 두세요."
             ),
             foreground="#a00",
             background="#fff8dc",
@@ -157,46 +168,50 @@ class SettingsTab(ttk.Frame):
         self._inner = None
         self._ship4_panel = None
         self._ship5_panel = None
+        self._supply_panel = None
         self._missing_label = None
 
     def _rebuild_for_current_environment(self) -> None:
         main_exe = main_exe_path(self._state)
         self._clear_content()
 
+        # supply 패널은 slot 만 필요하므로 항상 표시. ship4/5 는 MAIN.EXE 필요.
+        self._inner = ttk.Frame(self._content)
+        self._inner.pack(fill="both", expand=True)
+
         if main_exe is None:
-            self._missing_label = ttk.Label(
-                self._content,
-                text=_NO_MAINEXE_MSG,
+            note = ttk.Label(
+                self._inner,
+                text=_NO_MAINEXE_MSG + "\n(MAIN.EXE 가 필요한 sub-tab 은 비활성됩니다.)",
                 anchor="center",
                 justify="center",
                 foreground="#a00",
             )
-            self._missing_label.pack(expand=True, fill="both", padx=12, pady=12)
-            return
-
-        # 정상: sub-Notebook
-        self._inner = ttk.Frame(self._content)
-        self._inner.pack(fill="both", expand=True)
+            note.pack(side="top", fill="x", padx=12, pady=(8, 4))
 
         nb = ttk.Notebook(self._inner)
         nb.pack(fill="both", expand=True)
 
-        names = _ship_display_names(self._state)
+        if main_exe is not None:
+            names = _ship_display_names(self._state)
 
-        self._ship4_panel = _Ship4Panel(nb, self._state, main_exe, names)
-        nb.add(self._ship4_panel, text="함선 정적 스펙 (Ship4 ROM)")
+            self._ship4_panel = _Ship4Panel(nb, self._state, main_exe, names)
+            nb.add(self._ship4_panel, text="함선 정적 스펙 (Ship4 ROM)")
 
-        self._ship5_panel = _Ship5Panel(nb, self._state, main_exe, names)
-        nb.add(self._ship5_panel, text="함선 이름·외형 (Ship5 ROM)")
+            self._ship5_panel = _Ship5Panel(nb, self._state, main_exe, names)
+            nb.add(self._ship5_panel, text="함선 이름·외형 (Ship5 ROM)")
 
-        # 각 sub-panel 의 dirty 를 SettingsTab 으로 전파
-        self._ship4_panel.add_dirty_listener(self._on_panel_dirty)
-        self._ship5_panel.add_dirty_listener(self._on_panel_dirty)
+            self._ship4_panel.add_dirty_listener(self._on_panel_dirty)
+            self._ship5_panel.add_dirty_listener(self._on_panel_dirty)
+            self._ship4_panel.set_enabled(True)
+            self._ship5_panel.set_enabled(True)
 
-        # Ship4/Ship5 는 MAIN.EXE 만 필요하므로 항상 사용 가능.
-        self._ship4_panel.set_enabled(True)
-        self._ship5_panel.set_enabled(True)
-        # rebuild 직후에는 깨끗한 상태이므로 외부에 알린다.
+        # 항구 공급 수치 (물가) — analysis_J
+        self._supply_panel = _PortSupplyPanel(nb, self._state)
+        nb.add(self._supply_panel, text="항구 공급 수치 (물가)")
+        self._supply_panel.add_dirty_listener(self._on_panel_dirty)
+        self._supply_panel.set_enabled(self._slot_loaded)
+
         self._on_panel_dirty()
 
 
@@ -717,3 +732,251 @@ def _cascade_state(widget: tk.Misc, st: str) -> None:
         pass
     for ch in widget.winfo_children():
         _cascade_state(ch, st)
+
+
+# ---------------------------------------------------------------------------
+# Sub-panel: 항구 공급 수치 (물가) — analysis_J
+# ---------------------------------------------------------------------------
+
+
+def _decode_supply_byte_display(b: int) -> str:
+    """공급 byte → 사람이 읽을 수 있는 표시."""
+    if b == 0x2E:
+        return "'.' empty"
+    if 0x2F <= b <= 0x39:
+        level = b - 0x2F  # '/' = 0, '0' = 1, ..., '9' = 10
+        return f"'{chr(b)}' supply {level}"
+    return f"raw 0x{b:02X}"
+
+
+class _PortSupplyPanel(ttk.Frame):
+    """항구 공급 수치 편집 (record +14..+23, 10 byte/port).
+
+    표준 항구 (0..99) 는 0x2E..0x39 (ASCII digit/dot) 인코딩.
+    원거리 항구 (100..129) 는 raw byte (구조 미해석).
+    """
+
+    def __init__(self, master: tk.Misc, state: EditorState) -> None:
+        super().__init__(master, padding=8)
+        self._state = state
+        self._idx = 0
+        self._enabled = False
+        self._current_raw: bytes = b"\x00" * PORT_SUPPLY_SIZE
+
+        self._loading = False
+        self._dirty = False
+        self._dirty_listeners: list[Callable[[], None]] = []
+
+        self._vars: list[tk.IntVar] = [tk.IntVar(value=0) for _ in range(PORT_SUPPLY_SIZE)]
+        self._decoded_labels: list[ttk.Label] = []
+
+        self._build()
+        for v in self._vars:
+            v.trace_add("write", self._on_var_write)
+
+    # -------- 외부 인터페이스 --------
+
+    def is_dirty(self) -> bool:
+        return self._dirty and self._enabled
+
+    def add_dirty_listener(self, callback: Callable[[], None]) -> None:
+        self._dirty_listeners.append(callback)
+
+    def set_enabled(self, on: bool) -> None:
+        self._enabled = on
+        st = "normal" if on else "disabled"
+        try:
+            self._listbox.configure(state="normal" if on else "disabled")
+        except tk.TclError:
+            pass
+        for child in self.winfo_children():
+            _cascade_state(child, st)
+        if on:
+            # 슬롯이 활성화되었으므로 항구 이름이 캐시에 있을 것 — 목록 채움
+            self._populate_listbox()
+            if not self._listbox.curselection():
+                self._listbox.selection_set(0)
+                self._idx = 0
+            self._loading = True
+            try:
+                self._load_current()
+            finally:
+                self._loading = False
+            self._set_dirty(False)
+
+    def commit(self) -> None:
+        if not self.is_dirty():
+            return
+        try:
+            new_bytes = bytes(int(v.get()) & 0xFF for v in self._vars)
+        except (tk.TclError, ValueError):
+            raise ValueError("항구 공급 수치: 숫자가 아닌 값이 있습니다.")
+        try:
+            save_port_supply(self._state, self._idx, new_bytes)
+            self._state.fp.flush()
+        except Exception as e:
+            raise ValueError(f"항구 공급 수치 저장 실패: {e}") from e
+        self._current_raw = new_bytes
+        self._refresh_decoded_labels()
+        self._set_dirty(False)
+
+    # -------- 빌드 --------
+
+    def _build(self) -> None:
+        # 추가 경고 — 이 패널 특정 (이미 탭 상단에도 있지만 강조)
+        sub_warn = ttk.Label(
+            self,
+            text=(
+                "⚠️ 매우 위험: 가격 직접 입력이 아니라 byte-level 편집입니다.\n"
+                "    표준 항구 (idx 0..99) 는 byte 값 0x2E..0x39 (ASCII '.'..'9') 범위가 안전.\n"
+                "    원거리 항구 (idx 100..129) 는 구조 미해석 — 변경 시 게임 깨질 가능성 더 큼."
+            ),
+            foreground="#a00",
+            justify="left",
+        )
+        sub_warn.pack(side="top", fill="x", padx=4, pady=(0, 6))
+
+        # 좌측 항구 목록
+        left = ttk.Frame(self)
+        left.pack(side="left", fill="y", padx=(0, 8))
+        ttk.Label(left, text="항구 (130개):").pack(side="top", anchor="w")
+        list_frame = ttk.Frame(left)
+        list_frame.pack(side="top", fill="y", expand=True)
+        self._listbox = tk.Listbox(
+            list_frame, height=22, exportselection=False, width=22,
+        )
+        sb = ttk.Scrollbar(list_frame, orient="vertical", command=self._listbox.yview)
+        self._listbox.configure(yscrollcommand=sb.set)
+        self._listbox.pack(side="left", fill="y", expand=True)
+        sb.pack(side="right", fill="y")
+        self._listbox.bind("<<ListboxSelect>>", self._on_port_selected)
+
+        # 우측 폼
+        right = ttk.Frame(self)
+        right.pack(side="left", fill="both", expand=True)
+
+        self._lbl_current = ttk.Label(right, text="(항구 미선택)", foreground="#444")
+        self._lbl_current.pack(side="top", anchor="w", pady=(0, 6))
+
+        form = ttk.LabelFrame(right, text="공급 수치 (+14..+23, 10 byte)", padding=8)
+        form.pack(side="top", fill="x")
+
+        for i in range(PORT_SUPPLY_SIZE):
+            ttk.Label(form, text=f"슬롯 {i}").grid(row=i, column=0, sticky="w", padx=4, pady=2)
+            sp = ttk.Spinbox(
+                form, from_=0, to=255, textvariable=self._vars[i], width=6,
+            )
+            sp.grid(row=i, column=1, sticky="w", padx=4, pady=2)
+            lbl = ttk.Label(form, text="", foreground="#666")
+            lbl.grid(row=i, column=2, sticky="w", padx=8, pady=2)
+            self._decoded_labels.append(lbl)
+
+        # 버튼
+        btns = ttk.Frame(right)
+        btns.pack(side="top", fill="x", pady=8)
+        self._btn_reload = ttk.Button(btns, text="다시 불러오기", command=self._on_reload)
+        self._btn_reload.pack(side="right", padx=4)
+        self._btn_save = ttk.Button(btns, text="저장", command=self._on_save)
+        self._btn_save.pack(side="right", padx=4)
+
+        ttk.Label(
+            right,
+            text=(
+                "인코딩 (표준 항구 0..99 기준):\n"
+                "  '.' (0x2E) = 빈 슬롯, '/' (0x2F) = 공급 0 (가격 폭등),\n"
+                "  '0'..'9' (0x30..0x39) = 공급 1..10 (높을수록 가격 하락).\n"
+                "원거리 항구 (100..129) 는 위 인코딩이 아닙니다."
+            ),
+            foreground="#666",
+            justify="left",
+        ).pack(side="top", anchor="w")
+
+    def _populate_listbox(self) -> None:
+        self._listbox.delete(0, "end")
+        for i in range(NUM_PORTS):
+            name = self._state.port_name[i] if 0 <= i < len(self._state.port_name) else ""
+            mark = "" if i < 100 else " [원거리]"
+            self._listbox.insert("end", f"{i:3d}. {name}{mark}")
+
+    # -------- 콜백 --------
+
+    def _on_port_selected(self, _e: object = None) -> None:
+        if not self._enabled:
+            return
+        sel = self._listbox.curselection()
+        if not sel:
+            return
+        self._idx = int(sel[0])
+        self._loading = True
+        try:
+            self._load_current()
+        finally:
+            self._loading = False
+        self._set_dirty(False)
+
+    def _on_reload(self) -> None:
+        if not self._enabled:
+            return
+        self._loading = True
+        try:
+            self._load_current()
+        finally:
+            self._loading = False
+        self._set_dirty(False)
+
+    def _on_save(self) -> None:
+        if not self._enabled:
+            return
+        try:
+            self.commit()
+        except ValueError as e:
+            messagebox.showerror("저장 실패", str(e))
+            return
+        name = self._state.port_name[self._idx] if 0 <= self._idx < len(self._state.port_name) else ""
+        messagebox.showinfo("저장 완료", f"항구 #{self._idx} ({name}) 공급 수치 저장 완료.")
+
+    def _on_var_write(self, *_a: object) -> None:
+        if self._loading or not self._enabled:
+            return
+        # 실시간 디코딩 라벨 갱신
+        self._refresh_decoded_labels()
+        self._set_dirty(True)
+
+    def _set_dirty(self, value: bool) -> None:
+        if self._dirty == value:
+            return
+        self._dirty = value
+        for cb in list(self._dirty_listeners):
+            try:
+                cb()
+            except Exception:
+                pass
+
+    # -------- 로드/디코드 --------
+
+    def _load_current(self) -> None:
+        if not self._enabled:
+            return
+        try:
+            raw = load_port_supply(self._state, self._idx)
+        except Exception as e:
+            messagebox.showerror("공급 수치 로드 실패", str(e))
+            return
+        self._current_raw = raw
+        for i, b in enumerate(raw):
+            self._vars[i].set(b)
+        name = self._state.port_name[self._idx] if 0 <= self._idx < len(self._state.port_name) else ""
+        category = "표준" if self._idx < 100 else "원거리 (구조 미해석)"
+        std = "✓" if port_supply_is_standard(raw) else "✗"
+        self._lbl_current.configure(
+            text=f"항구 #{self._idx}  {name}   [{category}, 표준 인코딩 {std}]"
+        )
+        self._refresh_decoded_labels()
+
+    def _refresh_decoded_labels(self) -> None:
+        for i, lbl in enumerate(self._decoded_labels):
+            try:
+                b = int(self._vars[i].get()) & 0xFF
+            except (tk.TclError, ValueError):
+                b = 0
+            lbl.configure(text=_decode_supply_byte_display(b))
