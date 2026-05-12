@@ -261,6 +261,18 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 
 ## 버전 히스토리
 
+### v0.4.7 (2026-05-12 — 프로젝트 작업 규칙 등재 (CLAUDE.md))
+
+- **CLAUDE.md 신설** — 본 저장소에서 작업하는 AI 에이전트 (또는 협업자) 가
+  가장 먼저 읽어야 할 작업 규칙을 한 파일로 정리:
+  - 이슈 close 시 6 섹션 상세 코멘트 (보고된 현상 / 예상 원인 / 검토 결과 /
+    수정 진행 / 테스트 / 해결된·남겨진 사항) 필수, 사용자 검증 미완료 시 close 금지.
+  - 릴리스 cadence (변경 즉시 패치 태그) + `__version__` bump 절차.
+  - 기여자 마커 `!!!name!!!` 처리 규칙.
+  - 분석 문서 / 탐색 스크립트 명명 규칙.
+- 이슈 #4 (물가) reopen — 사용자 게임 내 검증 대기 중.
+- 기존 close 된 #1 / #2 / #3 에 retroactive 6-section 상세 코멘트 보강.
+
 ### v0.4.6 (2026-05-12 — 항구 공급 수치 (물가 영향) 편집 ([#4](https://github.com/genishs/dh2-py-editor/issues/4)) + 타이틀 버전 표시 수정)
 
 - **항구 공급 수치 편집** ([`analysis_J`](analysis/analysis_J_port_supply.md)) —
