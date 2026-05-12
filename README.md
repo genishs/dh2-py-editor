@@ -192,6 +192,9 @@ horiedit_py/
         person_tab.py          인물 편집 (스텁)
         ship_tab.py            선박 편집 (스텁)
         settings_tab.py        게임 기본 설정 편집 (스텁)
+assets/
+    icon.ico                 프로그램 아이콘 (Tk 창 + .exe 빌드, jws 제공)
+    icon_source.png          원본 PNG (240x240)
 analysis/                    원본 분석 노트
     analysis_A_*.md            영웅/인물/메뉴/IO
     analysis_B_*.md            선박/항구
@@ -215,7 +218,24 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 
 ---
 
+## Special thanks to
+
+이슈/PR/아이디어로 프로젝트에 기여해 주신 분들:
+
+- **jws** — 프로그램 아이콘 제공 ([#1](https://github.com/genishs/dh2-py-editor/issues/1))
+
+---
+
 ## 버전 히스토리
+
+### v0.4.2 (2026-05-12 — 프로그램 아이콘 추가)
+
+- **프로그램 아이콘** ([#1](https://github.com/genishs/dh2-py-editor/issues/1), jws 제공) —
+  `assets/icon.ico` (16/24/32/48/64/128/240 multi-size). PyInstaller `--icon`
+  으로 `.exe` 에 임베드, `--add-data` 로 onefile 빌드 런타임에 추출되어
+  Tk 창 `iconbitmap` 도 적용. dev / frozen 양쪽에서 `_MEIPASS` 또는
+  프로젝트 루트 자동 해석.
+- **README** — "Special thanks to" 섹션 신설. 이슈/PR 기여자 누적.
 
 ### v0.4.1 (2026-05-10 — 용어 정리 + 선박 가격/분류 + UI 개선)
 

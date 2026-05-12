@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import sys
 import tkinter as tk
 from pathlib import Path
 from tkinter import font as tkfont
@@ -28,6 +29,12 @@ _WIDTH = 980
 _HEIGHT = 700
 
 
+def _resource_path(*parts: str) -> Path:
+    """PyInstaller --onefile 빌드 / 개발 모드 양쪽에서 리소스 경로를 해석."""
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2]))
+    return base.joinpath(*parts)
+
+
 class EditorApp:
     """메인 윈도우 + 탭 컨테이너."""
 
@@ -39,6 +46,13 @@ class EditorApp:
         root.title(_TITLE)
         root.geometry(f"{_WIDTH}x{_HEIGHT}")
         root.minsize(820, 580)
+
+        icon_path = _resource_path("assets", "icon.ico")
+        if icon_path.is_file():
+            try:
+                root.iconbitmap(default=str(icon_path))
+            except tk.TclError:
+                pass
 
         self._configure_style()
         self._build()

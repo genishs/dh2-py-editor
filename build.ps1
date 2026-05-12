@@ -52,6 +52,8 @@ Write-Host "PyInstaller 빌드 중..." -ForegroundColor Cyan
     --onefile `
     --console `
     --name koukai2_editor `
+    --icon assets\icon.ico `
+    --add-data "assets\icon.ico;assets" `
     --noconfirm `
     --clean `
     koukai2_editor.py
