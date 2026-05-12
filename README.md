@@ -228,6 +228,17 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 
 ## 버전 히스토리
 
+### v0.4.4 (2026-05-12 — CI Node.js 24 액션 업그레이드 ([#3](https://github.com/genishs/dh2-py-editor/issues/3)))
+
+- **GitHub Actions 워크플로** — 2026-06-02 부터 강제되는 Node.js 24 런타임
+  대비. 사용 액션 메이저 버전 업:
+  - `actions/checkout@v4` → `@v6`
+  - `actions/setup-python@v5` → `@v6`
+  - `actions/upload-artifact@v4` → `@v7`
+  - `actions/download-artifact@v4` → `@v8`
+  - `softprops/action-gh-release@v2` → `@v3`
+- 결과 `.exe` 는 v0.4.3 과 기능 동일 (CI maintenance only).
+
 ### v0.4.3 (2026-05-12 — 항구 상업치/공업치 편집 ([#2](https://github.com/genishs/dh2-py-editor/issues/2)))
 
 - **항구 경제 테이블 발견** ([`analysis_I`](analysis/analysis_I_port_economy.md)) —
