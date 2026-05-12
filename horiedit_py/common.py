@@ -38,6 +38,11 @@ ship4_addr = 0x5291
 s_addr = 0x501D
 port_addr = 0x53BF
 
+# 항구 경제 (상업치/공업치/물가 후보) 테이블 — analysis_I
+# slot + port_econ_addr 시작, 130 × PORT_ECON_RECORD 구조.
+port_econ_addr = 0x5DE3
+PORT_ECON_RECORD = 37  # byte per port (확정: anchor 4개 일치)
+
 # Person 영역 종료 매직 넘버 (HORIEDIT.C:211)
 PERSON_AREA_END = 0x1DE7
 

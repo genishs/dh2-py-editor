@@ -19,6 +19,7 @@ from horiedit_py.common import state
 from horiedit_py.data import select_slot, slot_is_used
 from horiedit_py.gui.hero_tab import HeroTab
 from horiedit_py.gui.person_tab import PersonTab
+from horiedit_py.gui.port_tab import PortTab
 from horiedit_py.gui.settings_tab import SettingsTab
 from horiedit_py.gui.ship_tab import ShipTab
 from horiedit_py.gui.slot_select import SlotSelectFrame
@@ -115,15 +116,18 @@ class EditorApp:
         self._hero_tab = HeroTab(self._notebook, state)
         self._person_tab = PersonTab(self._notebook, state)
         self._ship_tab = ShipTab(self._notebook, state)
+        self._port_tab = PortTab(self._notebook, state)
         self._settings_tab = SettingsTab(self._notebook, state)
 
         self._notebook.add(self._hero_tab, text="주인공")
         self._notebook.add(self._person_tab, text="인물")
         self._notebook.add(self._ship_tab, text="선박")
+        self._notebook.add(self._port_tab, text="항구")
         self._notebook.add(self._settings_tab, text="게임 설정")
 
         self._tabs = (
-            self._hero_tab, self._person_tab, self._ship_tab, self._settings_tab,
+            self._hero_tab, self._person_tab, self._ship_tab,
+            self._port_tab, self._settings_tab,
         )
         for tab in self._tabs:
             tab.add_dirty_listener(self._update_action_buttons)

@@ -20,6 +20,7 @@ Thumbs.db
 *.tmp
 analysis/find_*.py
 analysis/verify_*.py
+analysis/agent_*.py
 
 # PyInstaller 산출물
 build/

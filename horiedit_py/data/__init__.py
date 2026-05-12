@@ -34,6 +34,8 @@ from horiedit_py.common import (
     ship2_addr,
     ship3_addr,
     port_addr,
+    port_econ_addr,
+    PORT_ECON_RECORD,
     INIT_HEADER_OFFSET,
 )
 

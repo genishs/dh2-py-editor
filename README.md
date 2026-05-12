@@ -228,6 +228,18 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 
 ## 버전 히스토리
 
+### v0.4.3 (2026-05-12 — 항구 상업치/공업치 편집 ([#2](https://github.com/genishs/dh2-py-editor/issues/2)))
+
+- **항구 경제 테이블 발견** ([`analysis_I`](analysis/analysis_I_port_economy.md)) —
+  slot 내 `0x5DE3` 시작, 130 항구 × 37 byte stride. commerce u16 LE @ +0,
+  industry u16 LE @ +4 확정 (사용자 anchor 4개 100% 일치).
+- **항구 탭 신설** — 130 항구 Treeview + 상업치/공업치 Spinbox (0..65535).
+  슬롯별 동적 편집. dirty/commit/revert/reload 통합.
+- **caveat** — port[0] (리스본) 의 commerce u16 영역이 port[129] (페어웰) 의
+  none[5] 후반부와 4 byte overlap. 극단값 편집 시 지도 좌표 영향 가능.
+  편집 전 백업 권장.
+- **물가 후보 (+14..+23)** 는 다음 버전에서 확정 후 추가 예정.
+
 ### v0.4.2 (2026-05-12 — 프로그램 아이콘 추가)
 
 - **프로그램 아이콘** ([#1](https://github.com/genishs/dh2-py-editor/issues/1), jws 제공) —
