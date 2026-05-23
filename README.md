@@ -92,7 +92,9 @@ GUI 도구.
 | 능력치 | 통솔, 항해, 지식, 직감, 공구, 검술, 매력, 행운 (Spinbox 0~255) |
 | 레벨/경험 | 항해 레벨/경험, 전투 레벨/경험 |
 | 능력 (비트) | 점술 / 회계 / 구급 / 지도작성 / 검술메뉴 (Checkbutton) |
-| 소속 (pos) | 0..255 Spinbox. 255 (0xFF) = 항구 정착민 / 254 (0xFE) = 특수 상태 / 0..68 = NPC 카탈로그·주인공. 변경 시 게임 진행 영향 가능 — 인물 #0..#5 변경 비권장 |
+| 현재 소속 (디코드 라벨) | "조안의 동료" / "(모집 가능)" / "(정착 — 항구이름, 여관·술집(가설))" / "(NPC 카탈로그 #0xNN)" — pos 값 자동 분해 |
+| 소속 변경 (Combobox) | 안전한 옵션만 노출: 6 hero 동료 / 모집 가능 / 항구 정착민. 선택 시 pos 자동 설정 |
+| 소속 (pos byte) | 0..255 Spinbox — 고급/직접 값. 255 = 정착민 / 254 = 모집 가능 / 0·10·20·30·40·50 = hero / 그 외 0..68 = NPC 카탈로그 (충돌 가능). 인물 #0..#5 변경 비권장 |
 | 정착 항구 | 130개 Combobox (`pos == 0xFF` 일 때만 활성, pos 를 255 로 바꾸면 즉시 활성화) |
 
 저장 시 잘못된 입력은 messagebox 로 차단.
@@ -261,6 +263,26 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 ---
 
 ## 버전 히스토리
+
+### v0.4.9 (2026-05-23 — 인물 동료 등록 + 소속 디코드 표시)
+
+- **인물 탭에 동료 등록/해제 Combobox 추가** ([`analysis_K`](analysis/analysis_K_companion_mechanism.md)).
+  agent 가 사용자 save 의 slot 0 (CAT) ↔ slot 1 (JOAN) 을 cross-slot 비교한 결과,
+  **`Person.pos` (byte +44) 값이 hero 의 catalog ID 와 같으면 그 hero 의 동료**
+  임이 확정되었다 (★★★★★). hero ↔ catalog ID:
+  - JOAN 0x00 / CAT 0x0A / OTTO 0x1E / ROPEZ 0x32 / PIET 0x28 / AL 0x14
+  - 0xFE = "모집 가능 / free", 0xFF = "항구 정착민"
+  - 별도 companion list 없음 — 단 1 byte 변경으로 party 동료 등록 가능.
+- **"현재 소속" 디코드 라벨** — Spinbox 의 raw pos 값을 사람이 읽을 수 있게 분해:
+  "카탈리나의 동료" / "(모집 가능)" / "(정착 — 마데이라, 여관(가설))" 등.
+- **소속 변경 Combobox** — 안전한 옵션 (6 hero + free + port settler) 만 노출.
+  raw byte 직접 입력은 기존 Spinbox 로 advanced 사용자만.
+- **검색 결과 Treeview 에 "소속" 컬럼 추가** — 인물 목록을 한눈에 분류 가능.
+- **술집/여관 추정 표시 (가설)** — pos == 0xFF 정착민의 `none2[1]` bit 7
+  (0x80) 이 set 이면 "여관(가설)", clear 면 "술집(가설)". 미구엘 (리스본 여관) +
+  필리 (마데이라 여관) 두 anchor 모두 bit 7 set 확인. 확정용 술집 anchor 미확보
+  로 "(가설)" 명시. 다음 버전 (v0.4.10) 의 MAIN.EXE catalog 테이블 역공학에서
+  확정 예정.
 
 ### v0.4.8 (2026-05-23 — 인물 위치/소속 편집 + 항구 공급 가설 폐기 정리)
 

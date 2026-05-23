@@ -18,6 +18,11 @@ from typing import Callable, Optional
 
 from horiedit_py.common import EditorState, Person, decode_kr, encode_kr_fixed
 from horiedit_py.data.person import (
+    HERO_CATALOG_ID,
+    HERO_CATALOG_TO_IDX,
+    POS_FREE,
+    POS_PORT_SETTLER,
+    describe_pos,
     find_persons,
     get_ability_bit,
     iter_persons,
@@ -26,6 +31,25 @@ from horiedit_py.data.person import (
     save_person,
     set_ability_bit,
 )
+
+
+# 안전한 소속 변경 옵션 (Combobox). 각 항목 → (라벨, pos 값 또는 None).
+# None = "(현재값 유지)" 더미 옵션 — Spinbox 로 변경된 raw 값을 그대로 둠.
+_POS_COMBO_OPTIONS: list[tuple[str, int | None]] = [
+    ("(현재값 유지 — Spinbox 로 직접 변경)", None),
+    ("조안의 동료", HERO_CATALOG_ID[0]),
+    ("카탈리나의 동료", HERO_CATALOG_ID[1]),
+    ("오토의 동료", HERO_CATALOG_ID[2]),
+    ("로페즈의 동료", HERO_CATALOG_ID[3]),
+    ("피에트로의 동료", HERO_CATALOG_ID[4]),
+    ("알의 동료", HERO_CATALOG_ID[5]),
+    ("(모집 가능 / free)", POS_FREE),
+    ("(항구 정착민)", POS_PORT_SETTLER),
+]
+_POS_COMBO_LABELS = [lbl for lbl, _ in _POS_COMBO_OPTIONS]
+_POS_COMBO_VALUE_TO_LABEL: dict[int, str] = {
+    v: lbl for lbl, v in _POS_COMBO_OPTIONS if v is not None
+}
 
 
 # (라벨, Person 속성, 최소, 최대) 8개 능력치 + 2개 레벨
@@ -78,6 +102,7 @@ class PersonTab(ttk.Frame):
         self._slot_loaded = False
         self._person_idx: Optional[int] = None
         self._current_pos: int = 0  # 마지막 로드한 인물의 pos
+        self._current_none2: bytes = b"\x00\x00"  # 디스크 값 보존 (술집/여관 표시용)
 
         self._loading = False
         self._dirty = False
@@ -103,6 +128,7 @@ class PersonTab(ttk.Frame):
             key: tk.IntVar(value=0) for _, key in _ABILITY_FIELDS
         }
         self._var_pos = tk.IntVar(value=0)
+        self._var_pos_combo = tk.StringVar(value=_POS_COMBO_LABELS[0])
         self._var_port = tk.StringVar()
 
         self._build()
@@ -166,18 +192,20 @@ class PersonTab(ttk.Frame):
         tv_frame.rowconfigure(0, weight=1)
         tv_frame.columnconfigure(0, weight=1)
 
-        cols = ("idx", "fname", "lname", "port")
+        cols = ("idx", "fname", "lname", "affiliation", "port")
         self._tv = ttk.Treeview(
             tv_frame, columns=cols, show="headings", height=14, selectmode="browse"
         )
         self._tv.heading("idx", text="번호")
         self._tv.heading("fname", text="처음이름")
         self._tv.heading("lname", text="마지막이름")
-        self._tv.heading("port", text="항구")
+        self._tv.heading("affiliation", text="소속")
+        self._tv.heading("port", text="항구·위치")
         self._tv.column("idx", width=50, anchor="center", stretch=False)
-        self._tv.column("fname", width=100, anchor="w")
-        self._tv.column("lname", width=100, anchor="w")
-        self._tv.column("port", width=100, anchor="w")
+        self._tv.column("fname", width=90, anchor="w")
+        self._tv.column("lname", width=90, anchor="w")
+        self._tv.column("affiliation", width=140, anchor="w")
+        self._tv.column("port", width=130, anchor="w")
         self._tv.grid(row=0, column=0, sticky="nsew")
 
         sb = ttk.Scrollbar(tv_frame, orient="vertical", command=self._tv.yview)
@@ -279,25 +307,48 @@ class PersonTab(ttk.Frame):
         port_frame.grid(row=5, column=0, sticky="ew", pady=4)
         port_frame.columnconfigure(1, weight=1)
 
-        ttk.Label(port_frame, text="소속 (pos)").grid(
+        # 현재 소속 (read-only 디코드 라벨, analysis_K)
+        ttk.Label(port_frame, text="현재 소속").grid(
             row=0, column=0, sticky="w", padx=2, pady=2
+        )
+        self._lbl_affiliation = ttk.Label(
+            port_frame, text="(인물을 먼저 선택하세요)", foreground="#246"
+        )
+        self._lbl_affiliation.grid(row=0, column=1, sticky="w", padx=2, pady=2)
+
+        # 소속 변경 Combobox (안전 옵션, analysis_K §9.2)
+        ttk.Label(port_frame, text="소속 변경").grid(
+            row=1, column=0, sticky="w", padx=2, pady=2
+        )
+        self._cb_pos = ttk.Combobox(
+            port_frame,
+            textvariable=self._var_pos_combo,
+            state="readonly",
+            width=32,
+            values=_POS_COMBO_LABELS,
+        )
+        self._cb_pos.grid(row=1, column=1, sticky="ew", padx=2, pady=2)
+        self._cb_pos.bind("<<ComboboxSelected>>", self._on_pos_combo_selected)
+
+        # 소속 raw byte (고급 / 직접 값 입력)
+        ttk.Label(port_frame, text="소속 (pos byte)").grid(
+            row=2, column=0, sticky="w", padx=2, pady=2
         )
         self._sp_pos = ttk.Spinbox(
             port_frame, from_=0, to=255, textvariable=self._var_pos, width=8
         )
-        self._sp_pos.grid(row=0, column=1, sticky="w", padx=2, pady=2)
+        self._sp_pos.grid(row=2, column=1, sticky="w", padx=2, pady=2)
         ttk.Label(
             port_frame,
             text=(
-                "값 의미: 255 (0xFF) = 항구 정착민,  254 (0xFE) = 특수 상태,\n"
-                "         0..68 (0x00..0x44) = NPC 카탈로그 / 주인공 인덱스.\n"
-                "* 변경 시 게임 진행이 깨질 수 있음. 특히 인물 #0..#5 (주인공) 는 변경 권장 안 함."
+                "값: 255 = 정착민 (port 활성), 254 = 모집 가능, 0/10/20/30/40/50 = hero 동료 (조안/카탈리나/알/오토/피에트로/로페즈), 0..68 그 외 = NPC 카탈로그 (충돌 가능).\n"
+                "* 인물 #0..#5 (주인공) 의 pos 는 게임 진행 상태 — 변경 권장 안 함."
             ),
             foreground="#888",
             justify="left",
-        ).grid(row=1, column=0, columnspan=2, sticky="w", padx=2, pady=(0, 4))
+        ).grid(row=3, column=0, columnspan=2, sticky="w", padx=2, pady=(0, 4))
 
-        ttk.Label(port_frame, text="항구").grid(row=2, column=0, sticky="w", padx=2, pady=2)
+        ttk.Label(port_frame, text="정착 항구").grid(row=4, column=0, sticky="w", padx=2, pady=2)
         self._cb_port = ttk.Combobox(
             port_frame,
             textvariable=self._var_port,
@@ -305,14 +356,14 @@ class PersonTab(ttk.Frame):
             width=22,
             values=[],
         )
-        self._cb_port.grid(row=2, column=1, sticky="ew", padx=2, pady=2)
+        self._cb_port.grid(row=4, column=1, sticky="ew", padx=2, pady=2)
         self._cb_port.bind("<<ComboboxSelected>>", self._on_dirty_event)
         self._lbl_port_hint = ttk.Label(
             port_frame,
             text="(pos != 0xFF 이므로 항구 편집 불가)",
             foreground="#888",
         )
-        self._lbl_port_hint.grid(row=3, column=0, columnspan=2, sticky="w", padx=2)
+        self._lbl_port_hint.grid(row=5, column=0, columnspan=2, sticky="w", padx=2)
 
     # ---------------- dirty 처리 ----------------
 
@@ -336,20 +387,83 @@ class PersonTab(ttk.Frame):
         self._set_dirty(True)
 
     def _on_pos_var_write(self, *_a: object) -> None:
-        """pos 변경 시: dirty 마크 + 항구 활성/비활성 즉시 반영."""
+        """pos 변경 시: dirty 마크 + 항구 활성/비활성 + 디코드 라벨 + combobox sync."""
         if self._loading:
             return
-        # 항구 콤보 상태는 슬롯/인물 미선택이어도 안전하게 갱신 가능
+        # 항구 콤보 상태 + 디코드 라벨은 항상 갱신
         self._update_port_state()
+        self._sync_pos_combo_from_var()
+        self._refresh_affiliation_label()
         if not self._slot_loaded or self._person_idx is None:
             return
         self._set_dirty(True)
+
+    def _on_pos_combo_selected(self, _event: object = None) -> None:
+        """Combobox 선택 → pos 값 설정 ("(현재값 유지)" 면 no-op)."""
+        if self._loading:
+            return
+        if not self._slot_loaded or self._person_idx is None:
+            return
+        label = self._var_pos_combo.get()
+        target_pos = None
+        for lbl, v in _POS_COMBO_OPTIONS:
+            if lbl == label:
+                target_pos = v
+                break
+        if target_pos is None:
+            return  # "(현재값 유지)" or 매칭 실패
+        try:
+            cur = int(self._var_pos.get())
+        except (tk.TclError, ValueError):
+            cur = -1
+        if cur != target_pos:
+            self._var_pos.set(target_pos)  # → _on_pos_var_write 가 dirty/UI 갱신
+
+    def _sync_pos_combo_from_var(self) -> None:
+        """현재 _var_pos 값에 해당하는 combobox 라벨로 표시 갱신 (없으면 '현재값 유지')."""
+        try:
+            cur = int(self._var_pos.get())
+        except (tk.TclError, ValueError):
+            return
+        lbl = _POS_COMBO_VALUE_TO_LABEL.get(cur, _POS_COMBO_LABELS[0])
+        if self._var_pos_combo.get() != lbl:
+            self._var_pos_combo.set(lbl)
+
+    def _refresh_affiliation_label(self) -> None:
+        """현재 폼 상태로 '현재 소속' 디코드 라벨 갱신."""
+        if not self._slot_loaded or self._person_idx is None:
+            try:
+                self._lbl_affiliation.configure(text="(인물을 먼저 선택하세요)")
+            except tk.TclError:
+                pass
+            return
+        try:
+            cur_pos = int(self._var_pos.get())
+        except (tk.TclError, ValueError):
+            cur_pos = 0
+        try:
+            cur_port_text = self._var_port.get()
+            cur_port_idx = self._parse_port_selection(cur_port_text)
+            if cur_port_idx is None:
+                cur_port_idx = 0
+        except Exception:
+            cur_port_idx = 0
+        # describe_pos 는 Person 객체를 요구 — 임시 Person 으로 wrap
+        # (none2 는 디스크 값 보존 필요 → _current_pos 갱신 시 같이 저장된 none2 사용)
+        tmp = Person(pos=cur_pos, port=cur_port_idx, none2=self._current_none2)
+        text = describe_pos(tmp, self._state.hero, self._state.port_name)
+        try:
+            self._lbl_affiliation.configure(text=f"{text}  (pos=0x{cur_pos:02X})")
+        except tk.TclError:
+            pass
 
     def _on_dirty_event(self, _event: object = None) -> None:
         if self._loading:
             return
         if not self._slot_loaded or self._person_idx is None:
             return
+        # 항구 콤보 변경 시 디코드 라벨도 즉시 갱신 (항구이름 표시)
+        self._refresh_affiliation_label()
         self._set_dirty(True)
 
     def _set_dirty(self, value: bool) -> None:
@@ -440,12 +554,17 @@ class PersonTab(ttk.Frame):
 
         # 결과 목록의 해당 행도 갱신
         self._refresh_result_row(self._person_idx, person)
+        # 디스크 값 캐시 갱신 (라벨 술집/여관 추정에 사용)
+        self._current_pos = person.pos
+        self._current_none2 = bytes(person.none2)
 
         fname_s = decode_kr(person.fname)
         lname_s = decode_kr(person.lname)
+        affiliation = describe_pos(person, self._state.hero, self._state.port_name)
         self._lbl_current.configure(
-            text=f"인물 #{self._person_idx}  {fname_s} {lname_s}  pos=0x{person.pos:02X}"
+            text=f"인물 #{self._person_idx}  {fname_s} {lname_s}  ·  {affiliation}"
         )
+        self._refresh_affiliation_label()
         self._set_dirty(False)
 
     # ---------------- 검색 ----------------
@@ -492,12 +611,13 @@ class PersonTab(ttk.Frame):
                 continue
             fname_s = decode_kr(p.fname)
             lname_s = decode_kr(p.lname)
+            affiliation_s = describe_pos(p, self._state.hero, self._state.port_name)
             port_s = ""
-            if p.pos == 0xFF:
-                if 0 <= p.port < len(self._state.port_name):
-                    port_s = self._state.port_name[p.port]
+            if p.pos == 0xFF and 0 <= p.port < len(self._state.port_name):
+                port_s = self._state.port_name[p.port]
             self._tv.insert(
-                "", "end", iid=str(idx), values=(idx, fname_s, lname_s, port_s)
+                "", "end", iid=str(idx),
+                values=(idx, fname_s, lname_s, affiliation_s, port_s),
             )
         self._lbl_count.configure(text=f"결과: {len(indices)}")
 
@@ -543,6 +663,7 @@ class PersonTab(ttk.Frame):
 
         self._person_idx = idx
         self._current_pos = p.pos
+        self._current_none2 = bytes(p.none2)  # describe_pos 의 술집/여관 추정용
 
         self._var_fname.set(decode_kr(p.fname))
         self._var_lname.set(decode_kr(p.lname))
@@ -556,6 +677,7 @@ class PersonTab(ttk.Frame):
             self._var_abilities[key].set(get_ability_bit(p, key))
 
         self._var_pos.set(int(p.pos))
+        self._sync_pos_combo_from_var()
 
         port_idx = p.port if 0 <= p.port < len(self._state.port_name) else 0
         port_name = ""
@@ -563,11 +685,13 @@ class PersonTab(ttk.Frame):
             port_name = f"{port_idx}: {self._state.port_name[port_idx]}"
         self._var_port.set(port_name)
         self._update_port_state()
+        self._refresh_affiliation_label()
 
         fname_s = decode_kr(p.fname)
         lname_s = decode_kr(p.lname)
+        affiliation = describe_pos(p, self._state.hero, self._state.port_name)
         self._lbl_current.configure(
-            text=f"인물 #{idx}  {fname_s} {lname_s}  pos=0x{p.pos:02X}"
+            text=f"인물 #{idx}  {fname_s} {lname_s}  ·  {affiliation}"
         )
 
     def _collect_form(self) -> Person:
@@ -658,10 +782,11 @@ class PersonTab(ttk.Frame):
             return
         fname_s = decode_kr(p.fname)
         lname_s = decode_kr(p.lname)
+        affiliation_s = describe_pos(p, self._state.hero, self._state.port_name)
         port_s = ""
         if p.pos == 0xFF and 0 <= p.port < len(self._state.port_name):
             port_s = self._state.port_name[p.port]
-        self._tv.item(iid, values=(idx, fname_s, lname_s, port_s))
+        self._tv.item(iid, values=(idx, fname_s, lname_s, affiliation_s, port_s))
 
     # ---------------- 항구 콤보 ----------------
 
@@ -712,7 +837,9 @@ class PersonTab(ttk.Frame):
         for var in self._var_abilities.values():
             var.set(0)
         self._var_pos.set(0)
+        self._var_pos_combo.set(_POS_COMBO_LABELS[0])
         self._var_port.set("")
+        self._current_none2 = b"\x00\x00"
 
     def _set_inputs_state(self, st: str) -> None:
         combo_state = "readonly" if st == "normal" else "disabled"
