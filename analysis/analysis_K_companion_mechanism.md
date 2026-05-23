@@ -63,24 +63,44 @@ party 등록은 pos 변경만으로 충분. **선장 임명**은 추가로 다�
 
 ship_num 의 카운트 로직은 `conferm_hero` (HORIEDIT.C:677-699) 와 동일.
 
-## 6. none2[0] 의 역할 코드 (★★ 미확정)
+## 6. none2[0] 의 역할 코드 (★★★ — pos 만으론 부족, 동반 필수 확인)
 
-agent 가 slot 0/1 비교에서 관찰한 패턴:
+agent 가 slot 0/1 비교에서 관찰한 패턴 + **v0.4.9 사용자 검증으로 추가 확인**:
 
 | Person | 역할 | none2[0] |
 |---|---|---|
-| p[69] (JOAN 선장) | 선장 | `0x02` |
-| p[70] (JOAN 선장) | 선장 | `0x02` |
-| p[71] (JOAN party) | party only | `0x06` |
-| p[72] (CAT party) | party only | `0x03` |
-| p[116] (CAT party) | party only | `0x06` |
+| p[69] (JOAN 선장 slot1) | 선장 | `0x02` |
+| p[70] (JOAN 선장 slot1) | 선장 | `0x02` |
+| p[71] (JOAN party slot1) | party only | `0x06` |
+| p[72] (CAT party slot0) | party only (항해사) | `0x03` |
+| p[116] (CAT party slot0) | party only (항해사) | `0x06` |
+| p[69..78] (free slot0) | free | `0x00` |
+| p[117] (정착민 slot0) | 정착민 | `0x00` |
 
-추정:
-- `0x02` = 선장 배속 marker
-- `0x06` = party member 일반
-- `0x03` = ? (다른 sub-role?)
+해석:
+- `0x00` = **활성 party 가 아님** (free / 정착민 / 비활성 hero) — 게임의 인물 목록 순회에서 **제외**
+- `0x02` = 선장 배속됨 (Ship2.captin 동반 필요)
+- `0x06` = party member (선장 없음)
+- `0x03` = ? (항해사 sub-role 추정 — 프랑코만 관찰)
 
-**확정 검증 필요** — 사용자 측 절차 §8.2 참조.
+### 6-1. v0.4.9 사용자 검증 — pos 만 변경은 불완전
+
+v0.4.9 의 Combobox 가 pos 만 hero catalog ID 로 바꾸자 게임 내 동작:
+- ✓ 해당 NPC 가 "제독님" 호칭 사용 (catalog ID 일치 = 소속 인식)
+- ✗ **인물 목록 (active party 순회) 에 표시 안 됨** (none2[0] = 0x00 이라 제외)
+
+**결론**: 동료 등록은 **pos + none2[0] 둘 다** 변경 필수.
+
+### 6-2. v0.4.10 자동 sync 정책
+
+`horiedit_py/gui/person_tab.py` 의 `_collect_form` 가:
+- pos 가 바뀌었고
+- 기존 none2[0] 이 INACTIVE / PARTY / 0x03 중 하나면 (선장 0x02 는 보존)
+- 새 pos 에 어울리는 role 로 none2[0] 자동 갱신:
+  - hero catalog → `PARTY (0x06)`
+  - free / 정착민 → `INACTIVE (0x00)`
+
+선장 (`0x02`) 보존 이유: Ship1/Ship2/Ship3 동반 갱신 없이 demote 시 game state 불일치 가능.
 
 ## 7. 별도 companion list 부정 (★★★★)
 

@@ -264,6 +264,21 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 
 ## 버전 히스토리
 
+### v0.4.10 (2026-05-23 — 동료 등록 핫픽스: none2[0] role marker 자동 동기화)
+
+- **v0.4.9 사용자 검증 결과**: pos 만 hero catalog ID 로 바꾸면 게임이 "동료"
+  로는 인식 ("제독님" 호칭) 하지만 **인물 목록 (active party 순회) 에는
+  표시되지 않음**. `none2[0]` 의 role marker 도 동반 변경 필요.
+- **수정**: 인물 탭의 commit 로직이 pos 변경 시 `none2[0]` 도 자동 동기화:
+  - hero catalog 동료 → `0x06` (PARTY)
+  - free (0xFE) / 정착민 (0xFF) → `0x00` (INACTIVE)
+  - 선장 marker (`0x02`) 는 보존 (Ship1/2/3 동반 갱신 없이 demote 시
+    game state 불일치 가능 — v0.4.11+ 의 별도 선장 배속 기능에서 안전 처리).
+- [`analysis_K §6`](analysis/analysis_K_companion_mechanism.md) 갱신:
+  none2[0] 의 역할 코드 (`0x00`/`0x02`/`0x03`/`0x06`) 및 v0.4.9 검증 결과 반영.
+- `horiedit_py/data/person.py` 에 `set_companion` / `unset_companion` API 도
+  none2[0] 동반 갱신하도록 보완.
+
 ### v0.4.9 (2026-05-23 — 인물 동료 등록 + 소속 디코드 표시)
 
 - **인물 탭에 동료 등록/해제 Combobox 추가** ([`analysis_K`](analysis/analysis_K_companion_mechanism.md)).

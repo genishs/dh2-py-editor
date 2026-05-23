@@ -20,6 +20,8 @@ from horiedit_py.common import EditorState, Person, decode_kr, encode_kr_fixed
 from horiedit_py.data.person import (
     HERO_CATALOG_ID,
     HERO_CATALOG_TO_IDX,
+    NONE2_ROLE_INACTIVE,
+    NONE2_ROLE_PARTY,
     POS_FREE,
     POS_PORT_SETTLER,
     describe_pos,
@@ -28,6 +30,7 @@ from horiedit_py.data.person import (
     iter_persons,
     load_person,
     person_count_max,
+    role_for_pos,
     save_person,
     set_ability_bit,
 )
@@ -342,6 +345,7 @@ class PersonTab(ttk.Frame):
             port_frame,
             text=(
                 "값: 255 = 정착민 (port 활성), 254 = 모집 가능, 0/10/20/30/40/50 = hero 동료 (조안/카탈리나/알/오토/피에트로/로페즈), 0..68 그 외 = NPC 카탈로그 (충돌 가능).\n"
+                "* pos 변경 시 none2[0] (role marker) 도 자동 동기화 (PARTY=0x06 / INACTIVE=0x00). 선장(0x02) marker 는 보존.\n"
                 "* 인물 #0..#5 (주인공) 의 pos 는 게임 진행 상태 — 변경 권장 안 함."
             ),
             foreground="#888",
@@ -743,7 +747,25 @@ class PersonTab(ttk.Frame):
             raise ValueError("인물: 소속(pos) 값이 숫자가 아닙니다.")
         if not _in_range(new_pos, 0, 255):
             raise ValueError("인물: 소속(pos) 는 0..255 범위여야 합니다.")
+        pos_changed = (new_pos != self._current_pos)
         p.pos = new_pos
+
+        # none2[0] role marker 자동 sync (v0.4.10, analysis_K §6 후속)
+        # pos 가 바뀌었고, 새 pos 가 hero 동료 / free / 정착민 같은 "안전" 범주면
+        # none2[0] 도 동반 갱신. 그러지 않으면 게임의 "인물 목록 (active party 순회)"
+        # 에서 새 동료가 보이지 않거나, 옛 동료 marker 가 남아 정착민 표시가 꼬임.
+        # 단, 기존 선장 (0x02) 을 함부로 demote 하면 Ship1/2/3 상태 불일치 가능 —
+        # 현재는 안전한 단순 케이스만 처리.
+        if pos_changed:
+            expected_role = role_for_pos(new_pos)
+            current_role = p.none2[0] if len(p.none2) >= 1 else 0
+            # PARTY (0x06) ↔ INACTIVE (0x00) 만 자동 동기화 (CAPTAIN 0x02 보존)
+            if current_role in (NONE2_ROLE_INACTIVE, NONE2_ROLE_PARTY, 0x03):
+                n2 = bytearray(p.none2)
+                if len(n2) < 2:
+                    n2 = bytearray(b"\x00\x00")
+                n2[0] = expected_role & 0xFF
+                p.none2 = bytes(n2)
 
         # 항구 (pos==0xFF 일 때만 의미 있음)
         if p.pos == 0xFF:
