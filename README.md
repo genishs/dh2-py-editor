@@ -264,6 +264,18 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 
 ## 버전 히스토리
 
+### v0.4.11 (2026-05-24 — 동료 등록 2차 핫픽스: none1 (loyalty) + port 자동 동기화)
+
+- **v0.4.10 사용자 검증 결과**: pos + none2[0] 만 바꿔도 게임 인물 목록에
+  여전히 표시 안 됨. 자한 사림 (정상 채용 동료) vs 필리·라울 (에디터 변환)
+  byte 비교로 추가 2 byte 가 필요함을 확정:
+  - `none1` (+43) = **100** ("동료 풀 안" 마커 / loyalty)
+  - `port` (+45) = **0xFF** (항구에 더 이상 없음)
+- **수정**: 인물 탭의 commit 가 pos 가 hero catalog / 모집 가능 (0xFE) 로
+  바뀔 때 위 2 byte 도 자동 동기화. `data/person.py` 의 `set_companion`
+  / `unset_companion` API 도 동일하게.
+- [`analysis_K §6-3, §6-4`](analysis/analysis_K_companion_mechanism.md) 갱신.
+
 ### v0.4.10 (2026-05-23 — 동료 등록 핫픽스: none2[0] role marker 자동 동기화)
 
 - **v0.4.9 사용자 검증 결과**: pos 만 hero catalog ID 로 바꾸면 게임이 "동료"

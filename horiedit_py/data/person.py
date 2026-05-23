@@ -45,6 +45,13 @@ NONE2_ROLE_INACTIVE = 0x00   # free / 정착민 / 비활성 hero — party 표�
 NONE2_ROLE_CAPTAIN = 0x02    # 선장 배속됨 (Ship1/2/3 도 갱신 필요 — 본 모듈 범위 밖)
 NONE2_ROLE_PARTY = 0x06      # party member (선장 없음)
 
+# Person.none1 (+43) = "동료 풀 등록" flag — v0.4.11 발견.
+# 자한 사림 (정상 동료): none1 = 100. 필리/라울 (에디터 변환): none1 = 0 → 미표시.
+# 추정: loyalty % 또는 "in active companion pool" 마커. 100 으로 set 해야 게임이
+# 인물 목록 순회에 포함시킴.
+NONE1_IN_POOL = 100   # 동료 / free / hero — 동료 풀 안
+NONE1_NOT_IN_POOL = 0  # 정착민 / NPC catalog — 풀 밖
+
 
 def role_for_pos(pos: int) -> int:
     """pos 값에 어울리는 none2[0] role marker.
@@ -127,7 +134,12 @@ def _set_none2_role(person: Person, role: int) -> None:
 def set_companion(state: EditorState, person_idx: int, hero_idx: int) -> None:
     """person_idx 를 hero_idx 의 party 동료로 등록.
 
-    pos = hero catalog ID + none2[0] = PARTY (0x06) 둘 다 갱신.
+    동시 갱신 (v0.4.11 확정):
+    - pos = hero catalog ID
+    - none2[0] = PARTY (0x06)
+    - none1 = 100 ("동료 풀 안" 마커)
+    - port = 0xFF (더 이상 항구에 없음)
+
     선장 배속은 추가 작업 (Ship1/2/3) 이 필요 — 본 함수는 party only.
     """
     if hero_idx not in HERO_CATALOG_ID:
@@ -135,14 +147,21 @@ def set_companion(state: EditorState, person_idx: int, hero_idx: int) -> None:
     person = load_person(state, person_idx)
     person.pos = HERO_CATALOG_ID[hero_idx]
     _set_none2_role(person, NONE2_ROLE_PARTY)
+    person.none1 = NONE1_IN_POOL
+    person.port = 0xFF
     save_person(state, person_idx, person)
 
 
 def unset_companion(state: EditorState, person_idx: int) -> None:
-    """동료 해제 — pos = 0xFE (모집 가능) + none2[0] = INACTIVE."""
+    """동료 해제 — pos = 0xFE (모집 가능) + none2[0] = INACTIVE.
+
+    none1 은 100 보존 (재고용 풀에 남음). port = 0xFF.
+    """
     person = load_person(state, person_idx)
     person.pos = POS_FREE
     _set_none2_role(person, NONE2_ROLE_INACTIVE)
+    person.none1 = NONE1_IN_POOL  # 풀 안 유지 (재고용 가능)
+    person.port = 0xFF
     save_person(state, person_idx, person)
 
 

@@ -20,6 +20,8 @@ from horiedit_py.common import EditorState, Person, decode_kr, encode_kr_fixed
 from horiedit_py.data.person import (
     HERO_CATALOG_ID,
     HERO_CATALOG_TO_IDX,
+    NONE1_IN_POOL,
+    NONE1_NOT_IN_POOL,
     NONE2_ROLE_INACTIVE,
     NONE2_ROLE_PARTY,
     POS_FREE,
@@ -345,7 +347,7 @@ class PersonTab(ttk.Frame):
             port_frame,
             text=(
                 "값: 255 = 정착민 (port 활성), 254 = 모집 가능, 0/10/20/30/40/50 = hero 동료 (조안/카탈리나/알/오토/피에트로/로페즈), 0..68 그 외 = NPC 카탈로그 (충돌 가능).\n"
-                "* pos 변경 시 none2[0] (role marker) 도 자동 동기화 (PARTY=0x06 / INACTIVE=0x00). 선장(0x02) marker 는 보존.\n"
+                "* pos 가 hero 동료 / 모집 가능 으로 바뀌면: none2[0]=0x06 (PARTY), none1=100 (loyalty), port=0xFF 자동 동기화. 선장(0x02) marker 는 보존.\n"
                 "* 인물 #0..#5 (주인공) 의 pos 는 게임 진행 상태 — 변경 권장 안 함."
             ),
             foreground="#888",
@@ -750,22 +752,30 @@ class PersonTab(ttk.Frame):
         pos_changed = (new_pos != self._current_pos)
         p.pos = new_pos
 
-        # none2[0] role marker 자동 sync (v0.4.10, analysis_K §6 후속)
-        # pos 가 바뀌었고, 새 pos 가 hero 동료 / free / 정착민 같은 "안전" 범주면
-        # none2[0] 도 동반 갱신. 그러지 않으면 게임의 "인물 목록 (active party 순회)"
-        # 에서 새 동료가 보이지 않거나, 옛 동료 marker 가 남아 정착민 표시가 꼬임.
-        # 단, 기존 선장 (0x02) 을 함부로 demote 하면 Ship1/2/3 상태 불일치 가능 —
-        # 현재는 안전한 단순 케이스만 처리.
+        # 동료/free 전환 시 동반 byte 자동 sync — v0.4.10 (none2[0]) + v0.4.11 (none1, port).
+        # 발견: 자한 사림(정상 동료) vs 필리·라울(에디터 변환) 비교에서
+        #   none1: 100 vs 0  → "동료 풀 안" 마커. 0 이면 게임의 인물 목록에서 제외
+        #   port:  0xFF vs 2 → 항구에 남아있음 으로 인식되면 동료 표시 안 됨
+        # → pos 가 hero catalog / 0xFE 로 가면 두 byte 도 in-pool 상태로 sync.
+        # 단, 기존 선장 (none2[0]=0x02) 은 Ship1/2/3 동반 갱신 없이 demote 시
+        # game state 불일치 → 보존.
         if pos_changed:
             expected_role = role_for_pos(new_pos)
             current_role = p.none2[0] if len(p.none2) >= 1 else 0
-            # PARTY (0x06) ↔ INACTIVE (0x00) 만 자동 동기화 (CAPTAIN 0x02 보존)
             if current_role in (NONE2_ROLE_INACTIVE, NONE2_ROLE_PARTY, 0x03):
                 n2 = bytearray(p.none2)
                 if len(n2) < 2:
                     n2 = bytearray(b"\x00\x00")
                 n2[0] = expected_role & 0xFF
                 p.none2 = bytes(n2)
+            # in-pool (hero catalog 또는 free) 로 가면 none1 + port 도 동반 sync
+            is_in_pool = (
+                new_pos in HERO_CATALOG_ID.values() or new_pos == POS_FREE
+            )
+            if is_in_pool:
+                if p.none1 == NONE1_NOT_IN_POOL:
+                    p.none1 = NONE1_IN_POOL
+                p.port = 0xFF
 
         # 항구 (pos==0xFF 일 때만 의미 있음)
         if p.pos == 0xFF:

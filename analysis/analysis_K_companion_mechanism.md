@@ -91,7 +91,7 @@ v0.4.9 의 Combobox 가 pos 만 hero catalog ID 로 바꾸자 게임 내 동작:
 
 **결론**: 동료 등록은 **pos + none2[0] 둘 다** 변경 필수.
 
-### 6-2. v0.4.10 자동 sync 정책
+### 6-2. v0.4.10 자동 sync 정책 (none2[0])
 
 `horiedit_py/gui/person_tab.py` 의 `_collect_form` 가:
 - pos 가 바뀌었고
@@ -101,6 +101,31 @@ v0.4.9 의 Combobox 가 pos 만 hero catalog ID 로 바꾸자 게임 내 동작:
   - free / 정착민 → `INACTIVE (0x00)`
 
 선장 (`0x02`) 보존 이유: Ship1/Ship2/Ship3 동반 갱신 없이 demote 시 game state 불일치 가능.
+
+### 6-3. v0.4.10 → v0.4.11 추가 발견 — none1 + port 도 필요
+
+v0.4.10 사용자 검증 결과: pos + none2[0] 만 바꿔도 여전히 인물 목록 표시 안 됨.
+
+자한 사림 (정상 동료) vs 필리·라울 (에디터 변환) byte 비교:
+
+| 필드 | 자한 (정상) | 필리·라울 (에디터 변환 직후) | 의미 |
+|---|---|---|---|
+| pos (+44) | 0x14 (AL) | 0x14 (AL) | OK |
+| none2[0] (+46) | 0x03 / 0x06 | 0x06 | OK (v0.4.10 sync) |
+| **none1 (+43)** | **100 (`0x64`)** | **0** | "동료 풀 안" 마커 — 0 이면 게임 인물 목록에서 제외 |
+| **port (+45)** | **0xFF** | **0x02 (옛 항구)** | 항구에 남아있다고 인식 → 동료 표시 안 됨 |
+
+추정:
+- `none1 = 100` = loyalty % 또는 "in active companion pool" 마커
+- `port = 0xFF` = "현재 항구에 없음 (동료)" — 항구 정착민일 때만 valid 항구 번호
+
+### 6-4. v0.4.11 추가 sync 정책 (none1, port)
+
+`_collect_form` 가 pos 가 **hero catalog 또는 0xFE** 로 바뀔 때:
+- `none1` 이 0 이면 100 으로 set ("풀 안" 마커)
+- `port` 를 0xFF 로 set (항구에서 떠남)
+
+free → 정착민 또는 hero → 정착민 의 경우 port 는 사용자가 명시적으로 콤보로 선택 (기존 흐름 그대로).
 
 ## 7. 별도 companion list 부정 (★★★★)
 
