@@ -206,9 +206,9 @@ class SettingsTab(ttk.Frame):
             self._ship4_panel.set_enabled(True)
             self._ship5_panel.set_enabled(True)
 
-        # 항구 공급 수치 (물가) — analysis_J
+        # 항구 공급 수치 (효과 미확인) — analysis_J §7
         self._supply_panel = _PortSupplyPanel(nb, self._state)
-        nb.add(self._supply_panel, text="항구 공급 수치 (물가)")
+        nb.add(self._supply_panel, text="항구 공급 수치 (효과 미확인)")
         self._supply_panel.add_dirty_listener(self._on_panel_dirty)
         self._supply_panel.set_enabled(self._slot_loaded)
 
@@ -823,13 +823,15 @@ class _PortSupplyPanel(ttk.Frame):
     # -------- 빌드 --------
 
     def _build(self) -> None:
-        # 추가 경고 — 이 패널 특정 (이미 탭 상단에도 있지만 강조)
+        # 추가 경고 — 이 패널 특정 (사용자 검증 결과 가격 직접 영향 없음 확인됨)
         sub_warn = ttk.Label(
             self,
             text=(
-                "⚠️ 매우 위험: 가격 직접 입력이 아니라 byte-level 편집입니다.\n"
-                "    표준 항구 (idx 0..99) 는 byte 값 0x2E..0x39 (ASCII '.'..'9') 범위가 안전.\n"
-                "    원거리 항구 (idx 100..129) 는 구조 미해석 — 변경 시 게임 깨질 가능성 더 큼."
+                "⚠️ 사용자 검증 결과 (v0.4.8): 본 byte 를 어떻게 바꿔도 시장 가격 / 평균물가 % 에\n"
+                "    즉시적인 영향은 확인되지 않았습니다. 게임이 byte 자체는 사용 (1달 후 자동 갱신 확인)\n"
+                "    하지만 player-visible 한 메커닉은 미상. 평균물가 % 는 매월 1일에만 변동.\n"
+                "    상세: analysis_J §7. 표준 항구 (0..99) 는 byte 0x2E..0x39 범위가 안전.\n"
+                "    원거리 항구 (100..129) 는 구조 미해석 — 변경 시 게임 깨질 가능성 더 큼."
             ),
             foreground="#a00",
             justify="left",

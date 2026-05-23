@@ -102,6 +102,7 @@ class PersonTab(ttk.Frame):
         self._var_abilities: dict[str, tk.IntVar] = {
             key: tk.IntVar(value=0) for _, key in _ABILITY_FIELDS
         }
+        self._var_pos = tk.IntVar(value=0)
         self._var_port = tk.StringVar()
 
         self._build()
@@ -273,12 +274,30 @@ class PersonTab(ttk.Frame):
             )
             cb.grid(row=0, column=i, sticky="w", padx=4, pady=2)
 
-        # 정착 항구
-        port_frame = ttk.LabelFrame(right, text="정착 항구", padding=8)
+        # 소속 / 정착 항구
+        port_frame = ttk.LabelFrame(right, text="소속 / 정착 항구", padding=8)
         port_frame.grid(row=5, column=0, sticky="ew", pady=4)
         port_frame.columnconfigure(1, weight=1)
 
-        ttk.Label(port_frame, text="항구").grid(row=0, column=0, sticky="w", padx=2, pady=2)
+        ttk.Label(port_frame, text="소속 (pos)").grid(
+            row=0, column=0, sticky="w", padx=2, pady=2
+        )
+        self._sp_pos = ttk.Spinbox(
+            port_frame, from_=0, to=255, textvariable=self._var_pos, width=8
+        )
+        self._sp_pos.grid(row=0, column=1, sticky="w", padx=2, pady=2)
+        ttk.Label(
+            port_frame,
+            text=(
+                "값 의미: 255 (0xFF) = 항구 정착민,  254 (0xFE) = 특수 상태,\n"
+                "         0..68 (0x00..0x44) = NPC 카탈로그 / 주인공 인덱스.\n"
+                "* 변경 시 게임 진행이 깨질 수 있음. 특히 인물 #0..#5 (주인공) 는 변경 권장 안 함."
+            ),
+            foreground="#888",
+            justify="left",
+        ).grid(row=1, column=0, columnspan=2, sticky="w", padx=2, pady=(0, 4))
+
+        ttk.Label(port_frame, text="항구").grid(row=2, column=0, sticky="w", padx=2, pady=2)
         self._cb_port = ttk.Combobox(
             port_frame,
             textvariable=self._var_port,
@@ -286,14 +305,14 @@ class PersonTab(ttk.Frame):
             width=22,
             values=[],
         )
-        self._cb_port.grid(row=0, column=1, sticky="ew", padx=2, pady=2)
+        self._cb_port.grid(row=2, column=1, sticky="ew", padx=2, pady=2)
         self._cb_port.bind("<<ComboboxSelected>>", self._on_dirty_event)
         self._lbl_port_hint = ttk.Label(
             port_frame,
             text="(pos != 0xFF 이므로 항구 편집 불가)",
             foreground="#888",
         )
-        self._lbl_port_hint.grid(row=1, column=0, columnspan=2, sticky="w", padx=2)
+        self._lbl_port_hint.grid(row=3, column=0, columnspan=2, sticky="w", padx=2)
 
     # ---------------- dirty 처리 ----------------
 
@@ -306,10 +325,22 @@ class PersonTab(ttk.Frame):
                     self._var_abilities):
             for v in src.values():
                 v.trace_add("write", self._on_var_write)
+        # 소속 (pos): dirty + 항구 편집 가능 여부 즉시 갱신
+        self._var_pos.trace_add("write", self._on_pos_var_write)
 
     def _on_var_write(self, *_a: object) -> None:
         if self._loading:
             return
+        if not self._slot_loaded or self._person_idx is None:
+            return
+        self._set_dirty(True)
+
+    def _on_pos_var_write(self, *_a: object) -> None:
+        """pos 변경 시: dirty 마크 + 항구 활성/비활성 즉시 반영."""
+        if self._loading:
+            return
+        # 항구 콤보 상태는 슬롯/인물 미선택이어도 안전하게 갱신 가능
+        self._update_port_state()
         if not self._slot_loaded or self._person_idx is None:
             return
         self._set_dirty(True)
@@ -524,6 +555,8 @@ class PersonTab(ttk.Frame):
         for _, key in _ABILITY_FIELDS:
             self._var_abilities[key].set(get_ability_bit(p, key))
 
+        self._var_pos.set(int(p.pos))
+
         port_idx = p.port if 0 <= p.port < len(self._state.port_name) else 0
         port_name = ""
         if 0 <= port_idx < len(self._state.port_name):
@@ -579,7 +612,16 @@ class PersonTab(ttk.Frame):
                 raise ValueError(f"인물: 능력({label}) 값이 잘못되었습니다.")
             set_ability_bit(p, key, 1 if bv else 0)
 
-        # 항구 (pos==0xFF 일 때만)
+        # 소속 (pos) — 사용자 편집 반영
+        try:
+            new_pos = int(self._var_pos.get())
+        except (tk.TclError, ValueError):
+            raise ValueError("인물: 소속(pos) 값이 숫자가 아닙니다.")
+        if not _in_range(new_pos, 0, 255):
+            raise ValueError("인물: 소속(pos) 는 0..255 범위여야 합니다.")
+        p.pos = new_pos
+
+        # 항구 (pos==0xFF 일 때만 의미 있음)
         if p.pos == 0xFF:
             port_idx = self._parse_port_selection(self._var_port.get())
             if port_idx is None:
@@ -630,16 +672,30 @@ class PersonTab(ttk.Frame):
 
     def _update_port_state(self) -> None:
         if not self._slot_loaded or self._person_idx is None:
-            self._cb_port.configure(state="disabled")
-            self._lbl_port_hint.configure(text="(인물을 먼저 선택하세요)")
+            try:
+                self._cb_port.configure(state="disabled")
+            except tk.TclError:
+                pass
+            try:
+                self._lbl_port_hint.configure(text="(인물을 먼저 선택하세요)")
+            except tk.TclError:
+                pass
             return
-        if self._current_pos == 0xFF:
+        # 현재 폼 위에 사용자가 입력한 pos 를 사용. 파싱 실패 시 디스크 값으로 fallback.
+        try:
+            cur_pos = int(self._var_pos.get())
+        except (tk.TclError, ValueError):
+            cur_pos = self._current_pos
+        if cur_pos == 0xFF:
             self._cb_port.configure(state="readonly")
             self._lbl_port_hint.configure(text="(정착 항구를 선택하세요)")
         else:
             self._cb_port.configure(state="disabled")
             self._lbl_port_hint.configure(
-                text=f"(pos = 0x{self._current_pos:02X} 이므로 항구 편집 불가)"
+                text=(
+                    f"(pos = 0x{cur_pos:02X} 이므로 항구 편집 불가 — "
+                    "pos 를 255 (0xFF) 로 변경하면 항구 콤보가 활성화됩니다)"
+                )
             )
 
     # ---------------- 폼 비우기 / 위젯 상태 ----------------
@@ -655,6 +711,7 @@ class PersonTab(ttk.Frame):
             var.set(0)
         for var in self._var_abilities.values():
             var.set(0)
+        self._var_pos.set(0)
         self._var_port.set("")
 
     def _set_inputs_state(self, st: str) -> None:
