@@ -39,7 +39,7 @@ jobs:
 
       - name: Build single-file executable
         run: |
-          python -m PyInstaller --onefile --console --name koukai2_editor --icon assets/icon.ico --add-data "assets/icon.ico;assets" --noconfirm --clean koukai2_editor.py
+          python -m PyInstaller --onefile --windowed --name koukai2_editor --icon assets/icon.ico --add-data "assets/icon.ico;assets" --noconfirm --clean koukai2_editor.py
 
       - name: Verify build artifact
         shell: pwsh

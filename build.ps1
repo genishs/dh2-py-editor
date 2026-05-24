@@ -50,7 +50,7 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "PyInstaller 빌드 중..." -ForegroundColor Cyan
 & $pythonCmd -m PyInstaller `
     --onefile `
-    --console `
+    --windowed `
     --name koukai2_editor `
     --icon assets\icon.ico `
     --add-data "assets\icon.ico;assets" `

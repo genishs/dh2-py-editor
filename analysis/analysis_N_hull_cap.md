@@ -35,27 +35,32 @@ dh2_cust/MAIN.EXE (한국어 빌드, 288,823 byte):
 
 함수 `0000:4D40` 은 cap 적용 (MIN) 루틴으로 추정.
 
-## 5. signature 기반 자동 탐색 (v0.4.13)
+## 5. signature 기반 자동 탐색 (v0.4.13, v0.4.14 정밀화)
 
-빌드별로 offset 이 다를 수 있어 하드코딩 회피. signature:
-```
-F7 F9 BA ?? 00 9A 40 4D 00 00
-         ^^ = cap byte (1..255)
-```
-패턴이 발견된 모든 `??` 위치 = cap 후보. dh2_cust/MAIN.EXE 에서는 3 곳:
-- `0x17525` value=50 (의미 불명 — 동일 signature, 다른 시스템)
+빌드별로 offset 이 다를 수 있어 하드코딩 회피.
+
+**v0.4.13 의 초기 signature** — `F7 F9 BA ?? 00 9A 40 4D 00 00` — 3 곳 매칭 (cust 기준):
+- `0x17525` value=50 (의미 불명, IDIV by 100)
 - `0x30893` value=100 (신조 cap #1)
 - `0x30A20` value=100 (신조 cap #2)
 
-`value=100` 만 표시값 "신조 cap (확정)" 으로 라벨링, 그 외는 "변경 주의" 경고.
+**v0.4.14 정밀화 signature** — `B9 0A 00 99 F7 F9 BA ?? 00 9A 40 4D 00 00` — 신조 cap 만 매칭:
+```
+B9 0A 00 99 F7 F9 BA ?? 00 9A 40 4D 00 00
+^MOV CX,10  ^IDIV CX^MOV DX, ??  ^CALL FAR 0000:4D40
+            ^CWD
+```
+"IDIV by 10" 부분이 신조 cap 의 특징 (재질 계수 0.8..1.3 을 10 분의 1 단위로 표현).
+다른 cap (예: IDIV by 100 인 `0x17525`) 는 자동 제외 → false positive 없음.
 
 ## 6. dh2_init/MAIN.EXE 의 경우
 
 다른 빌드 (297,783 byte, 한일 어느 버전인지 미정) 에서는 signature 미발견.
 이 경우 패널이 "이 빌드는 자동 검출 불가" 메시지 표시 + 편집 비활성.
 
-## 7. v0.4.13 구현
+## 7. 구현
 
+### v0.4.13
 `horiedit_py/data/game.py`:
 - `HULL_CAP_SIG_BEFORE` / `HULL_CAP_SIG_AFTER` 상수
 - `find_hull_cap_offsets(main_exe)` 패턴 검색
@@ -63,9 +68,14 @@ F7 F9 BA ?? 00 9A 40 4D 00 00
 - `save_hull_caps(main_exe, pairs)` 일괄 쓰기
 - `ensure_hull_cap_backup(main_exe)` / `restore_hull_cap_backup(main_exe)` — `.beforeHullCap` 백업
 
-`horiedit_py/gui/settings_tab.py`:
-- `_HullCapPanel` 신규 sub-tab "신조 내구도 cap (issue #5)"
-- Spinbox 1..255, [패치 적용] / [기본값(100) 복원] / [백업에서 복원] / [다시 불러오기]
+`horiedit_py/gui/settings_tab.py`: `_HullCapPanel` sub-tab (v0.4.13 한정)
+
+### v0.4.14 정리
+- signature 정밀화 (`B9 0A 00 99` prefix 추가) — false positive 자동 제외
+- sub-tab → **최상위 탭 "최대 내구도 수정"** (`horiedit_py/gui/hull_cap_tab.py`) 으로 분리
+- 입력 1 개 (Spinbox 단일) → 발견된 모든 위치에 일괄 적용
+- 슬롯/저장 흐름과 독립 (자체 [패치 적용] / [기본값(100) 으로 입력] / [백업에서 복원] / [다시 불러오기])
+- 메인 [저장] / dirty indicator 와 무관
 
 ## 8. 후속 과제
 

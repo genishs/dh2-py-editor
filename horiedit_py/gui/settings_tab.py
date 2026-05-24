@@ -22,16 +22,10 @@ from horiedit_py.common import (
     encode_kr_fixed,
 )
 from horiedit_py.data.game import (
-    HULL_CAP_DEFAULT,
     MAINEXE_TABLE_LEN,
-    ensure_hull_cap_backup,
-    hull_cap_backup_path,
-    load_hull_caps,
     load_ship4_rom,
     load_ship5_rom,
     main_exe_path,
-    restore_hull_cap_backup,
-    save_hull_caps,
     save_ship4_rom,
     save_ship5_rom,
 )
@@ -87,7 +81,6 @@ class SettingsTab(ttk.Frame):
         self._ship4_panel: Optional[_Ship4Panel] = None
         self._ship5_panel: Optional[_Ship5Panel] = None
         self._supply_panel: Optional[_PortSupplyPanel] = None
-        self._hull_cap_panel: Optional[_HullCapPanel] = None
         self._missing_label: Optional[ttk.Label] = None
 
         self._build_initial()
@@ -114,14 +107,14 @@ class SettingsTab(ttk.Frame):
         self.reload()
 
     def is_dirty(self) -> bool:
-        for panel in (self._ship4_panel, self._ship5_panel, self._supply_panel, self._hull_cap_panel):
+        for panel in (self._ship4_panel, self._ship5_panel, self._supply_panel):
             if panel is not None and panel.is_dirty():
                 return True
         return False
 
     def commit(self) -> None:
         """모든 sub-panel commit."""
-        for panel in (self._ship4_panel, self._ship5_panel, self._supply_panel, self._hull_cap_panel):
+        for panel in (self._ship4_panel, self._ship5_panel, self._supply_panel):
             if panel is None:
                 continue
             try:
@@ -176,7 +169,6 @@ class SettingsTab(ttk.Frame):
         self._ship4_panel = None
         self._ship5_panel = None
         self._supply_panel = None
-        self._hull_cap_panel = None
         self._missing_label = None
 
     def _rebuild_for_current_environment(self) -> None:
@@ -209,15 +201,10 @@ class SettingsTab(ttk.Frame):
             self._ship5_panel = _Ship5Panel(nb, self._state, main_exe, names)
             nb.add(self._ship5_panel, text="함선 이름·외형 (Ship5 ROM)")
 
-            self._hull_cap_panel = _HullCapPanel(nb, main_exe)
-            nb.add(self._hull_cap_panel, text="신조 내구도 cap (issue #5)")
-
             self._ship4_panel.add_dirty_listener(self._on_panel_dirty)
             self._ship5_panel.add_dirty_listener(self._on_panel_dirty)
-            self._hull_cap_panel.add_dirty_listener(self._on_panel_dirty)
             self._ship4_panel.set_enabled(True)
             self._ship5_panel.set_enabled(True)
-            self._hull_cap_panel.set_enabled(True)
 
         # 항구 공급 수치 (효과 미확인) — analysis_J §7
         self._supply_panel = _PortSupplyPanel(nb, self._state)
@@ -995,261 +982,3 @@ class _PortSupplyPanel(ttk.Frame):
             except (tk.TclError, ValueError):
                 b = 0
             lbl.configure(text=_decode_supply_byte_display(b))
-
-
-# ---------------------------------------------------------------------------
-# Sub-panel: 신조 내구도 cap (issue #5, analysis_N) — v0.4.13
-# ---------------------------------------------------------------------------
-
-
-class _HullCapPanel(ttk.Frame):
-    """MAIN.EXE 의 신조 내구도 cap 편집 (조선소 청구 내구력 상한).
-
-    - signature 검색 (BA ?? 00 9A 40 4D 00 00) 으로 cap byte 위치 자동 탐색
-    - 각 위치별 Spinbox (1..255) + [패치 적용] / [기본값(100) 복원] / [백업 복원]
-    - 첫 [패치 적용] 시 MAIN.EXE.beforeHullCap 자동 백업 생성
-    - dirty 모델: 폼이 디스크 값과 다르면 dirty. 자체 commit() = MAIN.EXE 쓰기.
-    """
-
-    def __init__(self, master: tk.Misc, main_exe) -> None:
-        super().__init__(master, padding=8)
-        self._main_exe = main_exe
-        self._enabled = False
-        self._loading = False
-        self._dirty = False
-        self._dirty_listeners: list[Callable[[], None]] = []
-
-        self._disk_caps: list[tuple[int, int]] = []  # [(offset, value)]
-        self._vars: dict[int, tk.IntVar] = {}
-        self._row_cur_labels: list[ttk.Label] = []
-        self._editable_widgets: list[tk.Misc] = []
-
-        self._build()
-        self.reload()
-
-    def is_dirty(self) -> bool:
-        return self._enabled and self._dirty
-
-    def add_dirty_listener(self, callback: Callable[[], None]) -> None:
-        self._dirty_listeners.append(callback)
-
-    def set_enabled(self, enabled: bool) -> None:
-        self._enabled = enabled
-        st = "normal" if enabled else "disabled"
-        for widget in self._editable_widgets:
-            try:
-                widget.configure(state=st)
-            except tk.TclError:
-                pass
-
-    def commit(self) -> None:
-        if not self._enabled or not self._dirty:
-            return
-        if not self._disk_caps:
-            return
-        try:
-            ensure_hull_cap_backup(self._main_exe)
-            pairs: list[tuple[int, int]] = []
-            for off, _ in self._disk_caps:
-                val = int(self._vars[off].get())
-                if not (1 <= val <= 255):
-                    raise ValueError(f"cap (offset 0x{off:05X}) 은 1..255 범위여야 합니다.")
-                pairs.append((off, val))
-            save_hull_caps(self._main_exe, pairs)
-        except Exception as e:
-            raise ValueError(f"신조 cap 저장 실패: {e}") from e
-        self._disk_caps = list(pairs)
-        self._set_dirty(False)
-        self._refresh_current_labels()
-        self._update_backup_label()
-
-    def reload(self) -> None:
-        self._loading = True
-        try:
-            self._disk_caps = load_hull_caps(self._main_exe)
-            self._rebuild_rows()
-        finally:
-            self._loading = False
-        self._set_dirty(False)
-
-    def _build(self) -> None:
-        header = ttk.Label(
-            self,
-            text=(
-                "조선소 신조 시 청구 내구력 cap (기본 100). 1..255 로 조정 가능.\n"
-                "signature 검색으로 MAIN.EXE 안의 cap 위치를 자동 탐색합니다.\n"
-                "첫 [패치 적용] 시 MAIN.EXE.beforeHullCap 백업이 자동 생성됩니다."
-            ),
-            foreground="#246",
-            justify="left",
-            padding=4,
-        )
-        header.pack(side="top", fill="x")
-
-        self._rows_frame = ttk.LabelFrame(self, text="발견된 cap 위치", padding=8)
-        self._rows_frame.pack(side="top", fill="x", padx=4, pady=6)
-
-        btns = ttk.Frame(self)
-        btns.pack(side="top", fill="x", pady=8)
-        self._btn_apply = ttk.Button(
-            btns, text="패치 적용 (저장)", command=self._on_apply, state="disabled"
-        )
-        self._btn_apply.pack(side="left", padx=4)
-        self._btn_default = ttk.Button(
-            btns, text="기본값 (100) 복원", command=self._on_reset_default, state="disabled"
-        )
-        self._btn_default.pack(side="left", padx=4)
-        self._btn_backup_restore = ttk.Button(
-            btns, text="백업에서 복원", command=self._on_restore_backup, state="disabled"
-        )
-        self._btn_backup_restore.pack(side="left", padx=4)
-        self._btn_reload = ttk.Button(
-            btns, text="다시 불러오기", command=self.reload, state="disabled"
-        )
-        self._btn_reload.pack(side="right", padx=4)
-
-        self._editable_widgets = [
-            self._btn_apply, self._btn_default, self._btn_backup_restore, self._btn_reload,
-        ]
-
-        self._lbl_backup = ttk.Label(self, text="", foreground="#666")
-        self._lbl_backup.pack(side="top", fill="x", padx=4)
-
-    def _rebuild_rows(self) -> None:
-        for ch in list(self._rows_frame.winfo_children()):
-            ch.destroy()
-        self._vars = {}
-        self._row_cur_labels = []
-        # editable_widgets 에서 행 스핀박스 비우고 버튼만 남김
-        self._editable_widgets = [
-            self._btn_apply, self._btn_default, self._btn_backup_restore, self._btn_reload,
-        ]
-
-        if not self._disk_caps:
-            ttk.Label(
-                self._rows_frame,
-                text=(
-                    "이 MAIN.EXE 빌드에서 cap signature 를 찾지 못했습니다.\n"
-                    "다른 버전의 빌드일 수 있습니다 (이 기능은 한국어 빌드 기준)."
-                ),
-                foreground="#a00",
-            ).pack(side="top", padx=8, pady=8)
-            self._update_backup_label()
-            return
-
-        hdr = ttk.Frame(self._rows_frame)
-        hdr.pack(side="top", fill="x")
-        ttk.Label(hdr, text="offset", width=12, anchor="w").pack(side="left")
-        ttk.Label(hdr, text="현재값", width=18, anchor="w").pack(side="left")
-        ttk.Label(hdr, text="새 값 (1..255)", width=14, anchor="w").pack(side="left")
-        ttk.Label(hdr, text="설명", anchor="w").pack(side="left", fill="x", expand=True)
-
-        for off, val in self._disk_caps:
-            row = ttk.Frame(self._rows_frame)
-            row.pack(side="top", fill="x", pady=2)
-            ttk.Label(row, text=f"0x{off:05X}", width=12, anchor="w").pack(side="left")
-            lbl_cur = ttk.Label(row, text=f"{val} (0x{val:02X})", width=18, anchor="w")
-            lbl_cur.pack(side="left")
-            var = tk.IntVar(value=val)
-            self._vars[off] = var
-            sp = ttk.Spinbox(row, from_=1, to=255, textvariable=var, width=8)
-            sp.pack(side="left")
-            self._editable_widgets.append(sp)
-            if val == HULL_CAP_DEFAULT:
-                desc, color = "신조 cap (확정)", "#246"
-            else:
-                desc, color = "동일 signature, 의미 불명 — 변경 주의", "#a60"
-            ttk.Label(row, text=desc, foreground=color, anchor="w").pack(
-                side="left", fill="x", expand=True
-            )
-            var.trace_add("write", self._on_var_write)
-            self._row_cur_labels.append(lbl_cur)
-
-        self._update_backup_label()
-
-    def _refresh_current_labels(self) -> None:
-        for (off, val), lbl in zip(self._disk_caps, self._row_cur_labels):
-            try:
-                lbl.configure(text=f"{val} (0x{val:02X})")
-            except tk.TclError:
-                pass
-
-    def _update_backup_label(self) -> None:
-        backup = hull_cap_backup_path(self._main_exe)
-        if backup.exists():
-            self._lbl_backup.configure(text=f"백업: {backup.name} (존재)")
-        else:
-            self._lbl_backup.configure(text=f"백업: {backup.name} (아직 없음 — 첫 패치 시 자동 생성)")
-
-    def _on_var_write(self, *_a: object) -> None:
-        if self._loading or not self._enabled:
-            return
-        dirty = False
-        for off, disk_val in self._disk_caps:
-            try:
-                cur = int(self._vars[off].get())
-            except (tk.TclError, ValueError):
-                continue
-            if cur != disk_val:
-                dirty = True
-                break
-        self._set_dirty(dirty)
-
-    def _set_dirty(self, value: bool) -> None:
-        if self._dirty == value:
-            return
-        self._dirty = value
-        for cb in list(self._dirty_listeners):
-            try:
-                cb()
-            except Exception:
-                pass
-
-    def _on_apply(self) -> None:
-        if not self._enabled:
-            return
-        try:
-            self.commit()
-        except ValueError as e:
-            messagebox.showerror("패치 실패", str(e))
-            return
-        messagebox.showinfo(
-            "패치 적용",
-            "MAIN.EXE 의 신조 cap 을 갱신했습니다.\n게임을 재실행해야 반영됩니다.",
-        )
-
-    def _on_reset_default(self) -> None:
-        if not self._enabled:
-            return
-        if not messagebox.askyesno(
-            "기본값 복원",
-            "모든 cap 을 100 (게임 기본값) 으로 되돌립니다.\n적용하려면 [패치 적용] 도 눌러야 합니다.",
-        ):
-            return
-        for off in self._vars:
-            self._vars[off].set(HULL_CAP_DEFAULT)
-
-    def _on_restore_backup(self) -> None:
-        if not self._enabled:
-            return
-        backup = hull_cap_backup_path(self._main_exe)
-        if not backup.exists():
-            messagebox.showinfo(
-                "백업 없음",
-                f"{backup.name} 가 없습니다 — 아직 패치한 적이 없습니다.",
-            )
-            return
-        if not messagebox.askyesno(
-            "백업에서 복원",
-            f"{backup.name} 로 MAIN.EXE 를 덮어씁니다. 진행할까요?",
-        ):
-            return
-        ok = restore_hull_cap_backup(self._main_exe)
-        if not ok:
-            messagebox.showerror("복원 실패", "백업 파일을 복원하지 못했습니다.")
-            return
-        self.reload()
-        messagebox.showinfo(
-            "복원 완료",
-            "MAIN.EXE 가 백업에서 복원되었습니다. 게임을 재실행해야 반영됩니다.",
-        )

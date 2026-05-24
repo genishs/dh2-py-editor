@@ -18,7 +18,14 @@ from typing import Optional
 from horiedit_py import __version__
 from horiedit_py.common import state
 from horiedit_py.data import select_slot, slot_is_used
+from horiedit_py.gui.help_dialog import (
+    open_issues_page,
+    show_about,
+    show_experimental_warning,
+    show_features_dialog,
+)
 from horiedit_py.gui.hero_tab import HeroTab
+from horiedit_py.gui.hull_cap_dialog import open_hull_cap_dialog
 from horiedit_py.gui.person_tab import PersonTab
 from horiedit_py.gui.port_tab import PortTab
 from horiedit_py.gui.settings_tab import SettingsTab
@@ -61,6 +68,51 @@ class EditorApp:
 
         root.protocol("WM_DELETE_WINDOW", self._on_close)
 
+    # ---------------- 메뉴바 ----------------
+
+    def _build_menubar(self) -> None:
+        """메뉴바 구성 — 슬롯/탭과 분리된 전역 작업."""
+        menubar = tk.Menu(self._root)
+
+        # 파일
+        file_menu = tk.Menu(menubar, tearoff=False)
+        file_menu.add_command(label="저장", command=self._on_save_all)
+        file_menu.add_command(label="초기화 (디스크에서 다시 읽기)", command=self._on_reset_all)
+        file_menu.add_separator()
+        file_menu.add_command(label="종료", command=self._on_close)
+        menubar.add_cascade(label="파일", menu=file_menu)
+
+        # 도구 — MAIN.EXE 패치 등 슬롯 무관 전역 작업
+        tools_menu = tk.Menu(menubar, tearoff=False)
+        tools_menu.add_command(
+            label="최대 내구도 수정...",
+            command=self._on_open_hull_cap,
+        )
+        menubar.add_cascade(label="도구", menu=tools_menu)
+
+        # 도움말
+        help_menu = tk.Menu(menubar, tearoff=False)
+        help_menu.add_command(
+            label="편집 가능한 항목...",
+            command=lambda: show_features_dialog(self._root),
+        )
+        help_menu.add_command(
+            label="시험 기능 / 가설 단계 경고...",
+            command=lambda: show_experimental_warning(self._root),
+        )
+        help_menu.add_separator()
+        help_menu.add_command(label="GitHub 이슈 보기", command=open_issues_page)
+        help_menu.add_command(
+            label="버전 정보...",
+            command=lambda: show_about(self._root),
+        )
+        menubar.add_cascade(label="도움말", menu=help_menu)
+
+        self._root.configure(menu=menubar)
+
+    def _on_open_hull_cap(self) -> None:
+        open_hull_cap_dialog(self._root, state)
+
     # ---------------- 스타일 ----------------
 
     def _configure_style(self) -> None:
@@ -77,6 +129,9 @@ class EditorApp:
     # ---------------- UI 구성 ----------------
 
     def _build(self) -> None:
+        # 메뉴바 — 슬롯과 무관한 전역 작업 (MAIN.EXE 패치 등)
+        self._build_menubar()
+
         # 상단 영역: 좌(슬롯) + 우(액션 + 슬롯 상세)
         top = ttk.Frame(self._root)
         top.pack(side="top", fill="x", padx=8, pady=(8, 4))

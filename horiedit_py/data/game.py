@@ -324,26 +324,28 @@ def save_rom_record_price(main_exe: Path, ship_type: int, price_display: int) ->
 #
 # 조선소 신조 메뉴에서 청구 내구력은 표준 내구력 × 재질 계수 (0.8..1.3) 로
 # 계산된다. 그러나 그 결과가 100 을 넘으면 100 으로 절단된다.
-# MAIN.EXE 에 다음 2 곳의 `MOV DX, 100` instruction 으로 인코딩되어 있다:
+# MAIN.EXE 의 신조 코드는 다음 패턴:
 #
-#   F7 F9 BA 64 00 9A 40 4D 00 00
-#   ^IDIV CX                ^CALL FAR 0000:4D40
-#         ^MOV DX, 100
+#   B9 0A 00 99 F7 F9 BA 64 00 9A 40 4D 00 00
+#   ^MOV CX,10   ^IDIV CX      ^CALL FAR 0000:4D40
+#               ^CWD     ^MOV DX, 100 (cap byte)
 #
-# `BA 64 00` 의 `64` 가 cap byte. 이 byte 를 0xFF (255) 로 바꾸면 cap 이 255 가 됨.
-# 한국어 가이드 (사용자 보고) 의 표준 offset: 0x30893, 0x30A20 (해당 빌드 기준).
-# offset 은 빌드에 따라 다를 수 있으므로 signature 검색으로 동적 탐색.
+# 즉 "(어떤 값) / 10" 후 "MOV DX, 100" 으로 cap 적재 + CALL.
+# 한국어 빌드에서 2 곳 (offset 0x30893, 0x30A20).
+#
+# 비슷한 signature 가 다른 곳 (예: MOV CX,100 으로 IDIV) 에도 있지만 그건
+# 다른 시스템의 cap (의미 불명) 이므로 'MOV CX,10' 으로 시작하는 패턴만 매칭.
 
-HULL_CAP_SIG_BEFORE = bytes.fromhex("F7F9BA")              # IDIV CX + MOV DX (opcode)
+HULL_CAP_SIG_BEFORE = bytes.fromhex("B90A0099F7F9BA")      # MOV CX,10 + CWD + IDIV CX + MOV DX
 HULL_CAP_SIG_AFTER = bytes.fromhex("009A404D0000")         # MOV DX 의 imm 상위 + CALL FAR
 HULL_CAP_DEFAULT = 100
 
 
 def find_hull_cap_offsets(main_exe: Path) -> list[int]:
-    """MAIN.EXE 안에서 'BA ?? 00 9A 40 4D 00 00' 패턴의 ?? byte offset 리스트.
+    """MAIN.EXE 안에서 신조 cap byte 의 offset 리스트.
 
-    이 byte 가 신조 cap 의 1 byte 즉시값 (MOV DX, imm).
-    빌드에 따라 0 곳 (지원 안 됨) ~ 2 곳 (표준) 까지.
+    패턴: 'B9 0A 00 99 F7 F9 BA ?? 00 9A 40 4D 00 00' — '?' 가 cap byte.
+    한국어 빌드 기준 보통 2 곳.
     """
     data = main_exe.read_bytes()
     out: list[int] = []

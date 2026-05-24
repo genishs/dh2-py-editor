@@ -264,6 +264,32 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 
 ## 버전 히스토리
 
+### v0.4.14 (2026-05-24 — 메뉴바 / 도움말 / 모달 다이얼로그 / 콘솔 창 제거)
+
+v0.4.13 의 "신조 내구도 cap" sub-tab 을 시작점으로 UI 전반 정리.
+
+- **메뉴바 신설** — 슬롯/탭과 시각·구조적으로 분리된 전역 작업 영역:
+  - **파일**: 저장 / 초기화 / 종료
+  - **도구**: 최대 내구도 수정...
+  - **도움말**: 편집 가능한 항목... / 시험 기능 경고... / GitHub 이슈 / 버전 정보
+- **최대 내구도 수정** ([#5](https://github.com/genishs/dh2-py-editor/issues/5))
+  을 sub-tab → 최상위 탭 → 최종 **[도구] 메뉴의 모달 다이얼로그** 로 정착
+  ([`horiedit_py/gui/hull_cap_dialog.py`](horiedit_py/gui/hull_cap_dialog.py)).
+  MAIN.EXE 패치는 세이브 슬롯과 무관하므로 슬롯/저장 흐름과 완전 독립.
+- **단일 Spinbox UI** — 발견된 모든 cap 위치에 같은 값 일괄 적용.
+- **signature 정밀화** — `B9 0A 00 99 F7 F9 BA ?? 00 9A 40 4D 00 00`
+  (IDIV by 10 인 신조 cap 만 매칭). v0.4.13 에서 false positive 였던
+  `0x17525` (의미 불명, IDIV by 100) 자동 제외.
+- **도움말 다이얼로그**
+  ([`horiedit_py/gui/help_dialog.py`](horiedit_py/gui/help_dialog.py)):
+  - [편집 가능한 항목...] — 5 탭 + 도구 메뉴 패치를 카테고리별 안내.
+  - [시험 기능 / 가설 단계 경고...] — 백업 필수, 효과 미확인 영역,
+    가설 byte 변경 주의 등. GitHub 이슈 바로 열기 버튼.
+  - [GitHub 이슈 보기] / [버전 정보...] — 브라우저 / 저장소 링크.
+- **GUI 모드 콘솔 창 제거** — PyInstaller `--console` → `--windowed`.
+  `build.bat` / `build.ps1` / `.github/workflows/release.yml` 모두 변경.
+  exe 실행 시 검은 cmd 창이 더 이상 안 뜨고 에디터 본창만 표시.
+
 ### v0.4.13 (2026-05-24 — 신조 내구도 cap 편집 ([#5](https://github.com/genishs/dh2-py-editor/issues/5)))
 
 - **MAIN.EXE 의 조선소 신조 cap (기본 100) 편집** — "게임 설정" 탭의
