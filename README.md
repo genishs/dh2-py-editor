@@ -264,6 +264,22 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 
 ## 버전 히스토리
 
+### v0.4.12 (2026-05-24 — 동료 등록 3차 핫픽스: party 배열 sync ★ 최종 fix)
+
+- **v0.4.11 사용자 검증 결과**: pos + none2[0] + none1 + port 4 byte 를 모두
+  맞춰도 게임 인물 목록에 여전히 표시 안 됨. dh2_init (pristine) vs dh2_cust
+  (에디터 변환) 두 KOUKAI2.DAT 비교로 외부 배열을 발견:
+  - **`slot + 0x21BE` 부터 30 byte 의 party 배열** (각 byte = person_idx, 0xFF=빈)
+  - **`slot + 0x21BB` byte = remaining_slots 카운터**
+  - 게임은 이 배열로부터 인물 목록 메뉴를 그린다. person.pos 만으로는 부족.
+- **수정**: 인물 탭의 commit 가 pos 변경으로 동료 등록/해제가 발생하면
+  party 배열에 person_idx 추가/제거 + counter 1 증감 동시 수행.
+- **사용자 hex 패치 검증 완료** (Test α): dh2_cust slot 1 에서 필리·라울 의
+  party 배열 슬롯을 직접 채우자 게임의 인물 목록에 정상 표시됨 → 가설 확정.
+- [`analysis_M_party_array.md`](analysis/analysis_M_party_array.md) 신설,
+  [`analysis_K §7`](analysis/analysis_K_companion_mechanism.md) 의
+  "별도 companion list 부정" 폐기.
+
 ### v0.4.11 (2026-05-24 — 동료 등록 2차 핫픽스: none1 (loyalty) + port 자동 동기화)
 
 - **v0.4.10 사용자 검증 결과**: pos + none2[0] 만 바꿔도 게임 인물 목록에

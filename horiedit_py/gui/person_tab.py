@@ -26,12 +26,15 @@ from horiedit_py.data.person import (
     NONE2_ROLE_PARTY,
     POS_FREE,
     POS_PORT_SETTLER,
+    add_to_party_array,
     describe_pos,
     find_persons,
     get_ability_bit,
+    is_in_party_array,
     iter_persons,
     load_person,
     person_count_max,
+    remove_from_party_array,
     role_for_pos,
     save_person,
     set_ability_bit,
@@ -552,11 +555,37 @@ class PersonTab(ttk.Frame):
             return
         if not self._dirty:
             return
+        old_pos = self._current_pos
         person = self._collect_form()
+        new_pos = person.pos
         try:
             save_person(self._state, self._person_idx, person)
         except Exception as e:
             raise ValueError(f"인물 저장 실패: {e}") from e
+
+        # v0.4.12 — party 배열 (slot+0x21BE) sync (analysis_M).
+        # 게임의 "인물 목록" 메뉴는 이 배열로부터 그려진다.
+        # 슬롯의 c_hero catalog ID 와 pos 가 일치하면 party 멤버.
+        try:
+            this_catalog = HERO_CATALOG_ID.get(self._state.c_hero)
+            if this_catalog is not None:
+                was_in_party = (old_pos == this_catalog)
+                now_in_party = (new_pos == this_catalog)
+                if not was_in_party and now_in_party:
+                    if not add_to_party_array(self._state, self._person_idx):
+                        messagebox.showwarning(
+                            "party 배열 가득 참",
+                            "이 hero 의 party 배열이 가득 찼습니다 (max 30). "
+                            "person.pos 는 저장되었지만 게임 인물 목록에는 추가되지 않습니다.",
+                        )
+                elif was_in_party and not now_in_party:
+                    remove_from_party_array(self._state, self._person_idx)
+        except Exception as e:
+            # party 배열 sync 실패는 치명적이지 않음 — 경고만
+            messagebox.showwarning(
+                "party 배열 sync 경고",
+                f"person 저장은 완료했으나 party 배열 sync 실패: {e}",
+            )
 
         # 결과 목록의 해당 행도 갱신
         self._refresh_result_row(self._person_idx, person)

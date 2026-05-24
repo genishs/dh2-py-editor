@@ -127,11 +127,13 @@ v0.4.10 사용자 검증 결과: pos + none2[0] 만 바꿔도 여전히 인물 �
 
 free → 정착민 또는 hero → 정착민 의 경우 port 는 사용자가 명시적으로 콤보로 선택 (기존 흐름 그대로).
 
-## 7. 별도 companion list 부정 (★★★★)
+## 7. 별도 companion list 부정 — **폐기 (2026-05-24, v0.4.12)** ✗
 
-- Person 영역 (0x06A9..0x1DE7) 자체에 동료 표시가 pos byte 로 인코딩되어 있음 → 별도 list 불필요
-- Person 영역과 Ship1 영역 사이 (0x1DE8..0x2243) 의 미해석 영역에서도 "동료 인덱스 배열" 같은 패턴 발견 안 됨
-- Ship2.none[27] 의 `14 14` 같은 패턴은 captin 과 무관 — cargo/f_crew 등 별도 데이터
+> ⚠ **이 절의 결론은 잘못이었다.** [`analysis_M_party_array.md`](analysis_M_party_array.md) 참조.
+>
+> dh2_cust vs dh2_init 두 KOUKAI2.DAT 비교 결과, **slot+0x21BE 부터의 30 byte party 배열** 이 발견되었다. 게임의 "인물 목록" UI 는 이 배열로부터 그려지며, person.pos 만으로는 충분하지 않다.
+>
+> 잘못된 이유: 1차 agent 분석은 미해석 영역의 byte 값을 단편적으로 봤을 뿐, init/cust 비교로 idx 패턴을 확인하지 못했다. v0.4.12 에서 party 배열 sync 가 추가되어 해결.
 
 ## 8. 사용자 검증 절차
 

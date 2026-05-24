@@ -53,6 +53,76 @@ NONE1_IN_POOL = 100   # 동료 / free / hero — 동료 풀 안
 NONE1_NOT_IN_POOL = 0  # 정착민 / NPC catalog — 풀 밖
 
 
+# ---------------------------------------------------------------------------
+# party 배열 — analysis_M, v0.4.12.
+# 게임의 "인물 목록" 메뉴는 person.pos 가 아니라 slot+0x21BE 부터의
+# 30 byte party 배열로부터 그린다. 동료 등록 시 이 배열도 갱신해야 게임에서 보임.
+# ---------------------------------------------------------------------------
+
+PARTY_ARRAY_OFFSET = 0x21BE       # slot-relative offset
+PARTY_ARRAY_SIZE = 30             # max party members (현재 hero 의 capacity 와는 다른 의미)
+PARTY_COUNTER_OFFSET = 0x21BB     # remaining_slots byte (party 추가 시 1 감소, 제거 시 1 증가)
+
+
+def _party_array_addr(state: EditorState) -> int:
+    return state.page + PARTY_ARRAY_OFFSET
+
+
+def _party_counter_addr(state: EditorState) -> int:
+    return state.page + PARTY_COUNTER_OFFSET
+
+
+def read_party_array(state: EditorState) -> bytes:
+    """slot+0x21BE 의 30 byte party 배열 (각 byte = person_idx, 0xFF=빈)."""
+    return state.read(_party_array_addr(state), PARTY_ARRAY_SIZE)
+
+
+def add_to_party_array(state: EditorState, person_idx: int) -> bool:
+    """party 배열의 첫 0xFF 슬롯에 person_idx 기록 + counter 1 감소.
+
+    이미 들어있으면 no-op (idempotent). 가득 차 있으면 False (실패) 반환.
+    """
+    idx = person_idx & 0xFF
+    base = _party_array_addr(state)
+    arr = bytearray(state.read(base, PARTY_ARRAY_SIZE))
+    if idx in arr:
+        return True
+    try:
+        slot = arr.index(0xFF)
+    except ValueError:
+        return False
+    arr[slot] = idx
+    state.write(base, bytes(arr))
+    caddr = _party_counter_addr(state)
+    c = state.read(caddr, 1)[0]
+    if c > 0:
+        state.write(caddr, bytes([c - 1]))
+    return True
+
+
+def remove_from_party_array(state: EditorState, person_idx: int) -> bool:
+    """party 배열에서 person_idx 를 0xFF 로 지움 + counter 1 증가.
+    배열에 없으면 no-op."""
+    idx = person_idx & 0xFF
+    base = _party_array_addr(state)
+    arr = bytearray(state.read(base, PARTY_ARRAY_SIZE))
+    if idx not in arr:
+        return False
+    slot = arr.index(idx)
+    arr[slot] = 0xFF
+    state.write(base, bytes(arr))
+    caddr = _party_counter_addr(state)
+    c = state.read(caddr, 1)[0]
+    if c < 0xFF:
+        state.write(caddr, bytes([c + 1]))
+    return True
+
+
+def is_in_party_array(state: EditorState, person_idx: int) -> bool:
+    arr = read_party_array(state)
+    return (person_idx & 0xFF) in arr
+
+
 def role_for_pos(pos: int) -> int:
     """pos 값에 어울리는 none2[0] role marker.
 
@@ -134,11 +204,12 @@ def _set_none2_role(person: Person, role: int) -> None:
 def set_companion(state: EditorState, person_idx: int, hero_idx: int) -> None:
     """person_idx 를 hero_idx 의 party 동료로 등록.
 
-    동시 갱신 (v0.4.11 확정):
+    동시 갱신 (v0.4.12 최종):
     - pos = hero catalog ID
     - none2[0] = PARTY (0x06)
     - none1 = 100 ("동료 풀 안" 마커)
     - port = 0xFF (더 이상 항구에 없음)
+    - **party 배열 (slot+0x21BE) 에 person_idx 추가** + counter 갱신 — analysis_M
 
     선장 배속은 추가 작업 (Ship1/2/3) 이 필요 — 본 함수는 party only.
     """
@@ -150,12 +221,15 @@ def set_companion(state: EditorState, person_idx: int, hero_idx: int) -> None:
     person.none1 = NONE1_IN_POOL
     person.port = 0xFF
     save_person(state, person_idx, person)
+    # v0.4.12 — 게임의 인물 목록 메뉴에 등록.
+    add_to_party_array(state, person_idx)
 
 
 def unset_companion(state: EditorState, person_idx: int) -> None:
     """동료 해제 — pos = 0xFE (모집 가능) + none2[0] = INACTIVE.
 
     none1 은 100 보존 (재고용 풀에 남음). port = 0xFF.
+    party 배열에서도 제거 (v0.4.12).
     """
     person = load_person(state, person_idx)
     person.pos = POS_FREE
@@ -163,6 +237,7 @@ def unset_companion(state: EditorState, person_idx: int) -> None:
     person.none1 = NONE1_IN_POOL  # 풀 안 유지 (재고용 가능)
     person.port = 0xFF
     save_person(state, person_idx, person)
+    remove_from_party_array(state, person_idx)
 
 
 def person_count_max() -> int:
