@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
@@ -315,3 +316,97 @@ def save_rom_record_price(main_exe: Path, ship_type: int, price_display: int) ->
         fp.seek(offset)
         fp.write(stored.to_bytes(2, "little"))
         fp.flush()
+
+
+# ===========================================================================
+# 신조 내구도 cap (issue #5, analysis_N) — v0.4.13
+# ===========================================================================
+#
+# 조선소 신조 메뉴에서 청구 내구력은 표준 내구력 × 재질 계수 (0.8..1.3) 로
+# 계산된다. 그러나 그 결과가 100 을 넘으면 100 으로 절단된다.
+# MAIN.EXE 에 다음 2 곳의 `MOV DX, 100` instruction 으로 인코딩되어 있다:
+#
+#   F7 F9 BA 64 00 9A 40 4D 00 00
+#   ^IDIV CX                ^CALL FAR 0000:4D40
+#         ^MOV DX, 100
+#
+# `BA 64 00` 의 `64` 가 cap byte. 이 byte 를 0xFF (255) 로 바꾸면 cap 이 255 가 됨.
+# 한국어 가이드 (사용자 보고) 의 표준 offset: 0x30893, 0x30A20 (해당 빌드 기준).
+# offset 은 빌드에 따라 다를 수 있으므로 signature 검색으로 동적 탐색.
+
+HULL_CAP_SIG_BEFORE = bytes.fromhex("F7F9BA")              # IDIV CX + MOV DX (opcode)
+HULL_CAP_SIG_AFTER = bytes.fromhex("009A404D0000")         # MOV DX 의 imm 상위 + CALL FAR
+HULL_CAP_DEFAULT = 100
+
+
+def find_hull_cap_offsets(main_exe: Path) -> list[int]:
+    """MAIN.EXE 안에서 'BA ?? 00 9A 40 4D 00 00' 패턴의 ?? byte offset 리스트.
+
+    이 byte 가 신조 cap 의 1 byte 즉시값 (MOV DX, imm).
+    빌드에 따라 0 곳 (지원 안 됨) ~ 2 곳 (표준) 까지.
+    """
+    data = main_exe.read_bytes()
+    out: list[int] = []
+    pos = 0
+    sig_len = len(HULL_CAP_SIG_BEFORE)
+    after_len = len(HULL_CAP_SIG_AFTER)
+    while True:
+        idx = data.find(HULL_CAP_SIG_BEFORE, pos)
+        if idx < 0:
+            break
+        imm_off = idx + sig_len
+        after_off = imm_off + 1
+        if data[after_off:after_off + after_len] == HULL_CAP_SIG_AFTER:
+            out.append(imm_off)
+        pos = idx + 1
+    return out
+
+
+def load_hull_caps(main_exe: Path) -> list[tuple[int, int]]:
+    """[(offset, value)] 리스트. 자동 탐색."""
+    offsets = find_hull_cap_offsets(main_exe)
+    if not offsets:
+        return []
+    data = main_exe.read_bytes()
+    return [(o, data[o]) for o in offsets]
+
+
+def save_hull_caps(main_exe: Path, offset_value_pairs: list[tuple[int, int]]) -> None:
+    """주어진 (offset, value) 들을 MAIN.EXE 에 일괄 쓴다.
+
+    각 value 는 0..255 범위. offset 은 find_hull_cap_offsets 가 반환한 값이어야
+    안전 (signature 검증된 위치).
+    """
+    for off, val in offset_value_pairs:
+        if not (0 <= val <= 0xFF):
+            raise ValueError(f"cap 은 0..255 범위여야 합니다: {val}")
+    with main_exe.open("r+b") as fp:
+        for off, val in offset_value_pairs:
+            fp.seek(off)
+            fp.write(bytes([val & 0xFF]))
+        fp.flush()
+
+
+HULL_CAP_BACKUP_SUFFIX = ".EXE.beforeHullCap"
+
+
+def hull_cap_backup_path(main_exe: Path) -> Path:
+    """백업 파일 경로 — MAIN.EXE 옆에 .EXE.beforeHullCap."""
+    return main_exe.with_suffix(HULL_CAP_BACKUP_SUFFIX)
+
+
+def ensure_hull_cap_backup(main_exe: Path) -> Path:
+    """백업이 없으면 생성. 있으면 그대로. 백업 경로 반환."""
+    backup = hull_cap_backup_path(main_exe)
+    if not backup.exists():
+        shutil.copy2(main_exe, backup)
+    return backup
+
+
+def restore_hull_cap_backup(main_exe: Path) -> bool:
+    """백업 파일에서 MAIN.EXE 복원. 백업이 없으면 False."""
+    backup = hull_cap_backup_path(main_exe)
+    if not backup.exists():
+        return False
+    shutil.copy2(backup, main_exe)
+    return True

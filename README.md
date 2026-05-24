@@ -264,6 +264,19 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 
 ## 버전 히스토리
 
+### v0.4.13 (2026-05-24 — 신조 내구도 cap 편집 ([#5](https://github.com/genishs/dh2-py-editor/issues/5)))
+
+- **MAIN.EXE 의 조선소 신조 cap (기본 100) 편집** — "게임 설정" 탭의
+  새 sub-tab "신조 내구도 cap".
+  - signature 검색 (`F7 F9 BA ?? 00 9A 40 4D 00 00`) 으로 cap byte 위치
+    자동 탐색 — 빌드별 offset 차이 흡수.
+  - 각 위치별 Spinbox (1..255). 한국어 빌드에서 보통 2 곳 (`0x30893`, `0x30A20`).
+  - [패치 적용] 첫 호출 시 `MAIN.EXE.beforeHullCap` 자동 백업.
+  - [기본값 (100) 복원] / [백업에서 복원] 버튼.
+- 사용자 검증 완료: 100 → 255 패치 → 함부르크 공업가치 3000 으로 신조 시
+  청구 내구력 198 확인. 100 으로 되돌리면 cap 정상 동작.
+- 새 분석: [`analysis_N_hull_cap.md`](analysis/analysis_N_hull_cap.md).
+
 ### v0.4.12 (2026-05-24 — 동료 등록 3차 핫픽스: party 배열 sync ★ 최종 fix)
 
 - **v0.4.11 사용자 검증 결과**: pos + none2[0] + none1 + port 4 byte 를 모두
