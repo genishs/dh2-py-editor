@@ -47,7 +47,7 @@ _TIPS = (
 )
 _TIP_INTERVAL_MS = 8000
 
-# 최초 실행 / 버전업 시 1회 "새 기능 소개" 표시 여부 마커
+# "새 기능 소개" 창을 프로그램 시작 시 열지 여부 설정 (게임 폴더 옆 파일)
 _SEEN_FILENAME = ".dh2editor_seen"
 
 
@@ -58,27 +58,29 @@ def _resource_path(*parts: str) -> Path:
 
 
 def _seen_marker_path() -> Optional[Path]:
-    """'새 기능 소개' 표시 기록 파일 경로 (게임 폴더 옆). game_dir 미설정 시 None."""
+    """'새 기능 소개' 설정 파일 경로 (게임 폴더 옆). game_dir 미설정 시 None."""
     gd = getattr(state, "game_dir", None)
     return (gd / _SEEN_FILENAME) if gd is not None else None
 
 
-def _read_seen_version() -> str:
+def _read_show_whats_new_on_startup() -> bool:
+    """시작 시 '새 기능 소개' 를 열지 여부. 파일이 없으면 기본 True (최초 실행 표시)."""
     p = _seen_marker_path()
     if p is None:
-        return ""
+        return True
     try:
-        return p.read_text(encoding="utf-8").strip()
+        return p.read_text(encoding="utf-8").strip() != "0"
     except Exception:
-        return ""
+        # 파일이 없거나 읽기 실패 → 기본 True
+        return True
 
 
-def _write_seen_version(version: str) -> None:
+def _write_show_whats_new_on_startup(value: bool) -> None:
     p = _seen_marker_path()
     if p is None:
         return
     try:
-        p.write_text(version, encoding="utf-8")
+        p.write_text("1" if value else "0", encoding="utf-8")
     except Exception:
         pass
 
@@ -137,7 +139,7 @@ class EditorApp:
         help_menu = tk.Menu(menubar, tearoff=False)
         help_menu.add_command(
             label="새 기능 소개...",
-            command=lambda: show_whats_new(self._root),
+            command=self._open_whats_new,
         )
         help_menu.add_command(
             label="편집 가능한 항목...",
@@ -199,14 +201,23 @@ class EditorApp:
         if shown == 0:
             self._on_open_hull_cap()
 
+    def _open_whats_new(self) -> None:
+        """새 기능 소개 창을 연다 (자동 시작 / 도움말 메뉴 공용).
+
+        하단 체크박스 '프로그램 시작 시 새 기능 소개 창 열기' 의 현재 설정을
+        반영하고, 닫을 때 설정을 저장한다.
+        """
+        cur = _read_show_whats_new_on_startup()
+        show_whats_new(
+            self._root,
+            show_on_startup=cur,
+            on_close=_write_show_whats_new_on_startup,
+        )
+
     def _maybe_show_whats_new(self) -> None:
-        """최초 실행 또는 버전업 시 1회 새 기능 소개 모달."""
-        if _read_seen_version() == __version__:
-            return
-        try:
-            show_whats_new(self._root)
-        finally:
-            _write_seen_version(__version__)
+        """시작 시 설정이 켜져 있으면 새 기능 소개 창을 표시."""
+        if _read_show_whats_new_on_startup():
+            self._open_whats_new()
 
     # ---------------- 스타일 ----------------
 

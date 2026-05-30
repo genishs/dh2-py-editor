@@ -37,9 +37,17 @@ from horiedit_py.data.game import (
     load_record_lhull,
     load_record_price,
     load_record_ship_class,
+    load_rom_record_kogyo,
+    load_rom_record_lhull,
+    load_rom_record_price,
+    load_rom_record_ship_class,
+    load_ship4_rom,
+    load_ship5_rom,
+    main_exe_path,
     save_record_kogyo,
     save_record_lhull,
     save_record_price,
+    save_record_ship_class,
 )
 from horiedit_py.data.ship import (
     cargo_recalc,
@@ -687,6 +695,20 @@ class _OrgShipEditor(ttk.Frame):
             right, r, "선박 가격", self._var_price, 0, PRICE_MAX_DISPLAY, PRICE_SCALE,
         ); r += 1
 
+        # 기본값으로 초기화 — 게임 본체 파일(MAIN.EXE)의 원본 함선 값으로 복원
+        self._btn_reset_default = ttk.Button(
+            right, text="이 배를 기본값으로 초기화",
+            command=self._on_reset_to_default,
+        )
+        self._btn_reset_default.grid(
+            row=r, column=0, columnspan=2, sticky="w", padx=4, pady=(10, 2),
+        ); r += 1
+        ttk.Label(
+            right,
+            text="* 게임 본체 파일(MAIN.EXE)에 저장된 이 함선의 원래 값으로 되돌립니다.",
+            foreground="#888",
+        ).grid(row=r, column=0, columnspan=2, sticky="w", padx=4); r += 1
+
         self.columnconfigure(1, weight=1)
 
     def _add_price_spinbox(
@@ -869,6 +891,95 @@ class _OrgShipEditor(ttk.Frame):
             self._loading = False
         self._set_dirty(False)
 
+    # ---------------- 기본값으로 초기화 ----------------
+
+    def _on_reset_to_default(self) -> None:
+        """게임 본체 파일(MAIN.EXE)의 원본 함선 값으로 이 함선을 복원."""
+        if not self._slot_loaded or self._sel is None:
+            return
+        main_exe = main_exe_path(self._state)
+        if main_exe is None:
+            messagebox.showwarning(
+                "기본값 초기화 불가",
+                "게임 본체 파일(MAIN.EXE)을 찾지 못했습니다.\n"
+                "저장 파일과 게임이 함께 있는 게임 폴더에서 실행해 주세요.",
+            )
+            return
+        sel = self._sel
+        name = ""
+        if 0 <= sel < len(self._state.ship_name):
+            name = self._state.ship_name[sel]
+        if not messagebox.askyesno(
+            "기본값으로 초기화",
+            f"'{name}' (함선 {sel + 1}번) 의 모든 설정값을\n"
+            "게임 본체 파일에 저장된 원래 값으로 되돌립니다.\n\n"
+            "진행할까요?",
+        ):
+            return
+
+        # ROM 원본값 로드
+        try:
+            rom4 = load_ship4_rom(main_exe, sel)
+            rom5 = load_ship5_rom(main_exe, sel)
+            rom_kogyo = load_rom_record_kogyo(main_exe, sel)
+            rom_lhull = load_rom_record_lhull(main_exe, sel)
+            rom_class = load_rom_record_ship_class(main_exe, sel)
+            rom_price = load_rom_record_price(main_exe, sel)
+        except Exception as e:
+            messagebox.showerror("기본값 초기화 실패", f"원본 값을 읽지 못했습니다: {e}")
+            return
+
+        # 폼 변수를 ROM 값으로 채운 뒤, 저장 로직(클램프 전파 포함)을 재사용.
+        self._loading = True
+        try:
+            self._var_name.set(decode_kr(rom5.name))
+            self._var_lsail.set(rom4.lsail)
+            self._var_lrudder.set(rom4.lrudder)
+            self._var_kogyo.set(rom_kogyo * 10)
+            self._var_lhull.set(rom_lhull)
+            self._var_capacity.set(rom4.capacity)
+            self._var_lcrew.set((rom4.lcrew & 0xFF) * 10)
+            self._var_dcrew.set(rom4.dcrew)
+            self._var_lnowea.set(rom4.lnowea)
+            self._var_price.set(rom_price)
+        finally:
+            self._loading = False
+
+        try:
+            self._collect_and_save(sel)
+            # 선박 분류(+9)도 원본으로 복원 (저장 로직은 분류를 건드리지 않음).
+            save_record_ship_class(self._state, sel, rom_class)
+            self._state.fp.flush()
+        except ValueError as e:
+            messagebox.showerror("기본값 초기화 실패", str(e))
+            return
+        except Exception as e:
+            messagebox.showerror("기본값 초기화 실패", str(e))
+            return
+
+        # 분류 표시 갱신
+        self._loaded_ship_class = rom_class
+        self._loading = True
+        try:
+            self._var_ship_class.set(rom_class)
+        finally:
+            self._loading = False
+
+        # 목록 이름 갱신 + 선택 유지
+        self._loading = True
+        try:
+            self._refresh_listbox()
+            self._listbox.selection_clear(0, "end")
+            self._listbox.selection_set(sel)
+            self._listbox.activate(sel)
+        finally:
+            self._loading = False
+        self._set_dirty(False)
+        messagebox.showinfo(
+            "기본값 초기화 완료",
+            f"'{decode_kr(rom5.name)}' (함선 {sel + 1}번) 을 기본값으로 되돌렸습니다.",
+        )
+
     # ---------------- 저장 ----------------
 
     def _collect_and_save(self, sel: int) -> None:
@@ -1024,7 +1135,7 @@ class _OrgShipEditor(ttk.Frame):
             self._en_name, self._sp_lsail, self._sp_lrudder,
             self._sp_kogyo, self._sp_lhull,
             self._sp_capacity, self._sp_lcrew, self._sp_dcrew, self._sp_lnowea,
-            self._sp_price,
+            self._sp_price, self._btn_reset_default,
         )
         for w in widgets:
             try:

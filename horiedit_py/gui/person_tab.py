@@ -138,6 +138,7 @@ class PersonTab(ttk.Frame):
         self._var_pos = tk.IntVar(value=0)
         self._var_pos_combo = tk.StringVar(value=_POS_COMBO_LABELS[0])
         self._var_port = tk.StringVar()
+        self._var_loyalty = tk.IntVar(value=0)  # none1 (+43) — 충성도
 
         self._build()
         self._set_inputs_state("disabled")
@@ -374,6 +375,24 @@ class PersonTab(ttk.Frame):
         )
         self._lbl_port_hint.grid(row=5, column=0, columnspan=2, sticky="w", padx=2)
 
+        # 충성도 (none1, +43) — 동료의 충성도 추정값
+        ttk.Label(port_frame, text="충성도").grid(
+            row=6, column=0, sticky="w", padx=2, pady=2
+        )
+        self._sp_loyalty = ttk.Spinbox(
+            port_frame, from_=0, to=255, textvariable=self._var_loyalty, width=8
+        )
+        self._sp_loyalty.grid(row=6, column=1, sticky="w", padx=2, pady=2)
+        ttk.Label(
+            port_frame,
+            text=(
+                "* 동료의 충성도 (0~255, 추정). 정상 동료는 보통 100.\n"
+                "* 동료/모집 가능으로 처음 바꾸면 0 일 때 자동으로 100 이 됩니다."
+            ),
+            foreground="#888",
+            justify="left",
+        ).grid(row=7, column=0, columnspan=2, sticky="w", padx=2, pady=(0, 4))
+
     # ---------------- dirty 처리 ----------------
 
     def _install_dirty_traces(self) -> None:
@@ -387,6 +406,8 @@ class PersonTab(ttk.Frame):
                 v.trace_add("write", self._on_var_write)
         # 소속 (pos): dirty + 항구 편집 가능 여부 즉시 갱신
         self._var_pos.trace_add("write", self._on_pos_var_write)
+        # 충성도 (none1)
+        self._var_loyalty.trace_add("write", self._on_var_write)
 
     def _on_var_write(self, *_a: object) -> None:
         if self._loading:
@@ -712,6 +733,7 @@ class PersonTab(ttk.Frame):
             self._var_abilities[key].set(get_ability_bit(p, key))
 
         self._var_pos.set(int(p.pos))
+        self._var_loyalty.set(int(p.none1))
         self._sync_pos_combo_from_var()
 
         port_idx = p.port if 0 <= p.port < len(self._state.port_name) else 0
@@ -780,6 +802,15 @@ class PersonTab(ttk.Frame):
             raise ValueError("인물: 소속은 0~255 사이여야 합니다.")
         pos_changed = (new_pos != self._current_pos)
         p.pos = new_pos
+
+        # 충성도 (none1) — 사용자 편집 반영 (아래 자동 sync 보다 먼저 적용).
+        try:
+            loyalty = int(self._var_loyalty.get())
+        except (tk.TclError, ValueError):
+            raise ValueError("인물: 충성도 값이 숫자가 아닙니다.")
+        if not _in_range(loyalty, 0, 255):
+            raise ValueError("인물: 충성도는 0~255 사이여야 합니다.")
+        p.none1 = loyalty
 
         # 동료/free 전환 시 동반 byte 자동 sync — v0.4.10 (none2[0]) + v0.4.11 (none1, port).
         # 발견: 자한 사림(정상 동료) vs 필리·라울(에디터 변환) 비교에서
@@ -900,6 +931,7 @@ class PersonTab(ttk.Frame):
         self._var_pos.set(0)
         self._var_pos_combo.set(_POS_COMBO_LABELS[0])
         self._var_port.set("")
+        self._var_loyalty.set(0)
         self._current_none2 = b"\x00\x00"
 
     def _set_inputs_state(self, st: str) -> None:

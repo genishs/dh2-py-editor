@@ -169,8 +169,16 @@ def _show_scrolling_text(
     width: int = 78,
     height: int = 28,
     extra_button: tuple[str, "object"] | None = None,
+    checkbox_label: str | None = None,
+    checkbox_initial: bool = False,
+    on_close: "object" = None,
 ) -> None:
-    """타이틀 + 스크롤 텍스트 + 닫기 (선택: 추가 버튼) 다이얼로그."""
+    """타이틀 + 스크롤 텍스트 + 닫기 (선택: 추가 버튼 / 체크박스) 다이얼로그.
+
+    checkbox_label 이 주어지면 하단에 체크박스를 표시하고, 창을 닫을 때
+    on_close(checked: bool) 콜백을 호출한다 (X 버튼 포함).
+    checkbox_initial 로 체크박스 초기 상태를 지정한다.
+    """
     win = tk.Toplevel(parent)
     win.title(title)
     win.transient(parent)
@@ -192,13 +200,28 @@ def _show_scrolling_text(
     txt.pack(side="left", fill="both", expand=True)
     sb.pack(side="right", fill="y")
 
+    check_var = tk.BooleanVar(value=checkbox_initial)
+
+    def _do_close() -> None:
+        if on_close is not None:
+            try:
+                on_close(bool(check_var.get()))
+            except Exception:
+                pass
+        win.destroy()
+
     btns = ttk.Frame(outer)
     btns.pack(fill="x", pady=(8, 0))
+    if checkbox_label is not None:
+        ttk.Checkbutton(
+            btns, text=checkbox_label, variable=check_var,
+        ).pack(side="left", padx=4)
     if extra_button is not None:
         label, cmd = extra_button
         ttk.Button(btns, text=label, command=cmd).pack(side="left", padx=4)
-    ttk.Button(btns, text="닫기", command=win.destroy).pack(side="right", padx=4)
+    ttk.Button(btns, text="닫기", command=_do_close).pack(side="right", padx=4)
 
+    win.protocol("WM_DELETE_WINDOW", _do_close)
     win.grab_set()
     win.focus_set()
 
@@ -231,13 +254,27 @@ def show_experimental_warning(parent: tk.Misc) -> None:
     )
 
 
-def show_whats_new(parent: tk.Misc) -> None:
+def show_whats_new(
+    parent: tk.Misc,
+    show_on_startup: bool = True,
+    on_close: "object" = None,
+) -> None:
+    """새 기능 소개 창.
+
+    하단에 '프로그램 시작 시 새 기능 소개 창 열기' 체크박스를 표시한다.
+    체크박스 초기 상태는 show_on_startup, 창을 닫을 때 on_close(checked: bool)
+    를 호출해 설정을 저장한다 (X 버튼 포함). 자동 표시 경로와 [도움말] 메뉴
+    경로 모두 동일한 체크박스를 쓴다.
+    """
     _show_scrolling_text(
         parent, "새 기능 소개", _WHATS_NEW_TEXT, height=30,
         extra_button=(
             "편집 가능한 항목 전체 보기",
             lambda: show_features_dialog(parent),
         ),
+        checkbox_label="프로그램 시작 시 새 기능 소개 창 열기",
+        checkbox_initial=show_on_startup,
+        on_close=on_close,
     )
 
 
