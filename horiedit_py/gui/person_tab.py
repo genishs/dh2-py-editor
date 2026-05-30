@@ -51,7 +51,7 @@ _POS_COMBO_OPTIONS: list[tuple[str, int | None]] = [
     ("로페즈의 동료", HERO_CATALOG_ID[3]),
     ("피에트로의 동료", HERO_CATALOG_ID[4]),
     ("알의 동료", HERO_CATALOG_ID[5]),
-    ("(모집 가능 / free)", POS_FREE),
+    ("(모집 가능)", POS_FREE),
     ("(항구 정착민)", POS_PORT_SETTLER),
 ]
 _POS_COMBO_LABELS = [lbl for lbl, _ in _POS_COMBO_OPTIONS]
@@ -155,7 +155,7 @@ class PersonTab(ttk.Frame):
 
         self._hint = ttk.Label(
             self,
-            text="(슬롯을 먼저 선택하세요)",
+            text="(세이브 칸을 먼저 선택하세요)",
             foreground="#888",
         )
         self._hint.grid(row=1, column=0, columnspan=2, pady=(8, 0))
@@ -297,8 +297,8 @@ class PersonTab(ttk.Frame):
             )
             sp.grid(row=0, column=1, padx=(4, 0))
 
-        # 비트필드 능력
-        ab_frame = ttk.LabelFrame(right, text="능력 (비트)", padding=8)
+        # 특수 능력
+        ab_frame = ttk.LabelFrame(right, text="특수 능력", padding=8)
         ab_frame.grid(row=4, column=0, sticky="ew", pady=4)
         for i, (label, key) in enumerate(_ABILITY_FIELDS):
             cb = ttk.Checkbutton(
@@ -338,8 +338,8 @@ class PersonTab(ttk.Frame):
         self._cb_pos.grid(row=1, column=1, sticky="ew", padx=2, pady=2)
         self._cb_pos.bind("<<ComboboxSelected>>", self._on_pos_combo_selected)
 
-        # 소속 raw byte (고급 / 직접 값 입력)
-        ttk.Label(port_frame, text="소속 (pos byte)").grid(
+        # 소속 직접 입력 (고급)
+        ttk.Label(port_frame, text="소속 (직접 입력 · 고급)").grid(
             row=2, column=0, sticky="w", padx=2, pady=2
         )
         self._sp_pos = ttk.Spinbox(
@@ -349,9 +349,9 @@ class PersonTab(ttk.Frame):
         ttk.Label(
             port_frame,
             text=(
-                "값: 255 = 정착민 (port 활성), 254 = 모집 가능, 0/10/20/30/40/50 = hero 동료 (조안/카탈리나/알/오토/피에트로/로페즈), 0..68 그 외 = NPC 카탈로그 (충돌 가능).\n"
-                "* pos 가 hero 동료 / 모집 가능 으로 바뀌면: none2[0]=0x06 (PARTY), none1=100 (loyalty), port=0xFF 자동 동기화. 선장(0x02) marker 는 보존.\n"
-                "* 인물 #0..#5 (주인공) 의 pos 는 게임 진행 상태 — 변경 권장 안 함."
+                "소속을 직접 숫자로 바꾸는 고급 입력란입니다. 보통은 위의 [소속 변경] 목록을 쓰세요.\n"
+                "* 동료/모집 가능으로 바꾸면 게임에 필요한 값이 자동으로 맞춰집니다.\n"
+                "* 1~6번 주인공의 소속은 게임 진행 상태이므로 바꾸지 않는 것을 권합니다."
             ),
             foreground="#888",
             justify="left",
@@ -369,7 +369,7 @@ class PersonTab(ttk.Frame):
         self._cb_port.bind("<<ComboboxSelected>>", self._on_dirty_event)
         self._lbl_port_hint = ttk.Label(
             port_frame,
-            text="(pos != 0xFF 이므로 항구 편집 불가)",
+            text="(정착민이 아니므로 항구를 정할 수 없습니다)",
             foreground="#888",
         )
         self._lbl_port_hint.grid(row=5, column=0, columnspan=2, sticky="w", padx=2)
@@ -462,7 +462,7 @@ class PersonTab(ttk.Frame):
         tmp = Person(pos=cur_pos, port=cur_port_idx, none2=self._current_none2)
         text = describe_pos(tmp, self._state.hero, self._state.port_name)
         try:
-            self._lbl_affiliation.configure(text=f"{text}  (pos=0x{cur_pos:02X})")
+            self._lbl_affiliation.configure(text=text)
         except tk.TclError:
             pass
 
@@ -574,17 +574,17 @@ class PersonTab(ttk.Frame):
                 if not was_in_party and now_in_party:
                     if not add_to_party_array(self._state, self._person_idx):
                         messagebox.showwarning(
-                            "party 배열 가득 참",
-                            "이 hero 의 party 배열이 가득 찼습니다 (max 30). "
-                            "person.pos 는 저장되었지만 게임 인물 목록에는 추가되지 않습니다.",
+                            "동료를 더 넣을 수 없습니다",
+                            "이 주인공의 동료가 가득 찼습니다 (최대 30명). "
+                            "소속은 저장됐지만 게임 인물 목록에는 추가되지 않습니다.",
                         )
                 elif was_in_party and not now_in_party:
                     remove_from_party_array(self._state, self._person_idx)
         except Exception as e:
             # party 배열 sync 실패는 치명적이지 않음 — 경고만
             messagebox.showwarning(
-                "party 배열 sync 경고",
-                f"person 저장은 완료했으나 party 배열 sync 실패: {e}",
+                "동료 목록 갱신 경고",
+                f"인물 정보는 저장했지만 동료 목록 갱신에 실패했습니다: {e}",
             )
 
         # 결과 목록의 해당 행도 갱신
@@ -775,9 +775,9 @@ class PersonTab(ttk.Frame):
         try:
             new_pos = int(self._var_pos.get())
         except (tk.TclError, ValueError):
-            raise ValueError("인물: 소속(pos) 값이 숫자가 아닙니다.")
+            raise ValueError("인물: 소속 값이 숫자가 아닙니다.")
         if not _in_range(new_pos, 0, 255):
-            raise ValueError("인물: 소속(pos) 는 0..255 범위여야 합니다.")
+            raise ValueError("인물: 소속은 0~255 사이여야 합니다.")
         pos_changed = (new_pos != self._current_pos)
         p.pos = new_pos
 
@@ -810,9 +810,9 @@ class PersonTab(ttk.Frame):
         if p.pos == 0xFF:
             port_idx = self._parse_port_selection(self._var_port.get())
             if port_idx is None:
-                raise ValueError("인물: 정착 항구를 선택하세요 (pos == 0xFF 인 인물).")
+                raise ValueError("인물: 정착 항구를 선택하세요 (정착민인 경우).")
             if not _in_range(port_idx, 0, 129):
-                raise ValueError("인물: 항구 인덱스는 0..129 범위여야 합니다.")
+                raise ValueError("인물: 항구 번호는 0~129 사이여야 합니다.")
             p.port = port_idx
 
         return p
@@ -879,8 +879,8 @@ class PersonTab(ttk.Frame):
             self._cb_port.configure(state="disabled")
             self._lbl_port_hint.configure(
                 text=(
-                    f"(pos = 0x{cur_pos:02X} 이므로 항구 편집 불가 — "
-                    "pos 를 255 (0xFF) 로 변경하면 항구 콤보가 활성화됩니다)"
+                    "(정착민이 아니므로 항구를 정할 수 없습니다 — "
+                    "소속을 [항구 정착민]으로 바꾸면 항구를 고를 수 있습니다)"
                 )
             )
 

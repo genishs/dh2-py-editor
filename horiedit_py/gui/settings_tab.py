@@ -39,14 +39,14 @@ from horiedit_py.data.port import (
 
 
 _HEADER_HINT = (
-    "[참고] 이 탭은 MAIN.EXE 의 ROM 데이터를 직접 편집합니다.\n"
-    "       편집 전 MAIN.EXE 백업을 권장합니다.\n"
-    "       등장공업치 / 최대 내구도는 [선박] 탭의 [원래 함선 정보] 에서 편집할 수 있습니다."
+    "[참고] 이 탭은 게임 본체 파일(MAIN.EXE)을 직접 바꿉니다.\n"
+    "       편집 전 게임 본체 파일 복사를 권장합니다.\n"
+    "       등장공업치 / 최대 내구도는 [선박] 탭의 [원래 함선 정보] 에서 바꿀 수 있습니다."
 )
 
 _NO_MAINEXE_MSG = (
-    "MAIN.EXE 를 찾지 못했습니다.\n"
-    "이 프로그램을 KOUKAI2.DAT 와 MAIN.EXE 가 같이 있는 게임 폴더에서 실행해 주세요."
+    "게임 본체 파일(MAIN.EXE)을 찾지 못했습니다.\n"
+    "저장 파일과 게임이 함께 있는 게임 폴더에서 실행해 주세요."
 )
 
 
@@ -58,7 +58,7 @@ def _ship_display_names(state: EditorState) -> list[str]:
         if 0 <= i < len(state.ship_name):
             name = (state.ship_name[i] or "").strip()
         if not name:
-            name = f"함선 #{i:02d}"
+            name = f"함선 {i + 1}번"
         out.append(name)
     return out
 
@@ -140,8 +140,8 @@ class SettingsTab(ttk.Frame):
             self,
             text=(
                 "⚠️ 시험 기능 — 이 탭의 항목 편집은 게임 실행에 오류를 일으킬 수 있습니다.\n"
-                "   분석이 완전치 않거나 가설 단계의 영역을 직접 편집합니다.\n"
-                "   편집 전 KOUKAI2.DAT 와 MAIN.EXE 백업을 반드시 만들어 두세요."
+                "   분석이 완전치 않거나 덜 밝혀진 영역을 직접 편집합니다.\n"
+                "   편집 전 저장 파일(KOUKAI2.DAT)과 게임 본체 파일(MAIN.EXE)을 반드시 복사해 두세요."
             ),
             foreground="#a00",
             background="#fff8dc",
@@ -182,7 +182,7 @@ class SettingsTab(ttk.Frame):
         if main_exe is None:
             note = ttk.Label(
                 self._inner,
-                text=_NO_MAINEXE_MSG + "\n(MAIN.EXE 가 필요한 sub-tab 은 비활성됩니다.)",
+                text=_NO_MAINEXE_MSG + "\n(게임 본체 파일이 필요한 항목은 사용할 수 없습니다.)",
                 anchor="center",
                 justify="center",
                 foreground="#a00",
@@ -196,19 +196,19 @@ class SettingsTab(ttk.Frame):
             names = _ship_display_names(self._state)
 
             self._ship4_panel = _Ship4Panel(nb, self._state, main_exe, names)
-            nb.add(self._ship4_panel, text="함선 정적 스펙 (Ship4 ROM)")
+            nb.add(self._ship4_panel, text="함선 기본 성능")
 
             self._ship5_panel = _Ship5Panel(nb, self._state, main_exe, names)
-            nb.add(self._ship5_panel, text="함선 이름·외형 (Ship5 ROM)")
+            nb.add(self._ship5_panel, text="함선 이름·모양")
 
             self._ship4_panel.add_dirty_listener(self._on_panel_dirty)
             self._ship5_panel.add_dirty_listener(self._on_panel_dirty)
             self._ship4_panel.set_enabled(True)
             self._ship5_panel.set_enabled(True)
 
-        # 항구 공급 수치 (효과 미확인) — analysis_J §7
+        # 항구 공급 수치 (효과 불확실) — analysis_J §7
         self._supply_panel = _PortSupplyPanel(nb, self._state)
-        nb.add(self._supply_panel, text="항구 공급 수치 (효과 미확인)")
+        nb.add(self._supply_panel, text="항구 공급 수치 (효과 불확실)")
         self._supply_panel.add_dirty_listener(self._on_panel_dirty)
         self._supply_panel.set_enabled(self._slot_loaded)
 
@@ -269,34 +269,34 @@ class _Ship4Panel(ttk.Frame):
         self._listbox.pack(side="left", fill="y", expand=True)
         sb.pack(side="right", fill="y")
         for i, name in enumerate(self._ship_names):
-            self._listbox.insert("end", f"{i:02d}. {name}")
+            self._listbox.insert("end", f"{i + 1}. {name}")
         self._listbox.bind("<<ListboxSelect>>", self._on_ship_selected)
 
         # 우측 폼
         right = ttk.Frame(self)
         right.pack(side="left", fill="both", expand=True)
 
-        form = ttk.LabelFrame(right, text="Ship4 ROM 필드", padding=8)
+        form = ttk.LabelFrame(right, text="함선 기본 성능", padding=8)
         form.pack(side="top", fill="x")
 
-        self._add_spin(form, 0, "최대 회전력 (lrudder)", self._var_lrudder, 0, 255)
-        self._add_spin(form, 1, "최대 돛 (lsail)", self._var_lsail, 0, 255)
+        self._add_spin(form, 0, "최대 회전력", self._var_lrudder, 0, 255)
+        self._add_spin(form, 1, "최대 돛", self._var_lsail, 0, 255)
         self._add_spin(
             form,
             2,
-            "최대 승무원 (lcrew × 10)",
+            "최대 승무원",
             self._var_lcrew_max,
             0,
             2550,
         )
         ttk.Label(
             form,
-            text="* 저장 시 //10. 0..2550 범위. lcrew 자체는 0..255.",
+            text="* 0~2550 범위로 입력합니다 (10 단위로 저장됩니다).",
             foreground="#888",
         ).grid(row=3, column=0, columnspan=2, sticky="w", padx=4)
-        self._add_spin(form, 4, "필요 승무원 (dcrew)", self._var_dcrew, 0, 255)
-        self._add_spin(form, 5, "최대 적재량 (capacity)", self._var_capacity, 0, 65535)
-        self._add_spin(form, 6, "최대 무기수 (lnowea)", self._var_lnowea, 0, 255)
+        self._add_spin(form, 4, "필요 승무원", self._var_dcrew, 0, 255)
+        self._add_spin(form, 5, "최대 적재량", self._var_capacity, 0, 65535)
+        self._add_spin(form, 6, "최대 무기수", self._var_lnowea, 0, 255)
 
         # 버튼
         btns = ttk.Frame(right)
@@ -310,8 +310,8 @@ class _Ship4Panel(ttk.Frame):
         note = ttk.Label(
             right,
             text=(
-                "이 편집은 MAIN.EXE 의 ROM 만 변경합니다.\n"
-                "주인공 함대의 슬롯 내 데이터는 영향받지 않습니다."
+                "이 편집은 게임 본체 파일만 바꿉니다.\n"
+                "현재 세이브 칸의 함대 정보에는 영향을 주지 않습니다."
             ),
             foreground="#666",
             justify="left",
@@ -367,7 +367,7 @@ class _Ship4Panel(ttk.Frame):
         try:
             ship4 = load_ship4_rom(self._main_exe, self._idx)
         except Exception as e:
-            messagebox.showerror("Ship4 ROM 로드 실패", str(e))
+            messagebox.showerror("함선 기본 성능 불러오기 실패", str(e))
             return
         self._current = ship4
         self._var_lrudder.set(ship4.lrudder)
@@ -411,26 +411,26 @@ class _Ship4Panel(ttk.Frame):
             capacity = int(self._var_capacity.get())
             lnowea = int(self._var_lnowea.get())
         except (tk.TclError, ValueError):
-            raise ValueError("Ship4 ROM: 숫자 필드에 잘못된 값이 있습니다.")
+            raise ValueError("함선 기본 성능: 숫자 칸에 잘못된 값이 있습니다.")
         if not _in_range(lrudder, 0, 255):
-            raise ValueError("Ship4 ROM: 최대 회전력은 0..255 입니다.")
+            raise ValueError("함선 기본 성능: 최대 회전력은 0~255 사이여야 합니다.")
         if not _in_range(lsail, 0, 255):
-            raise ValueError("Ship4 ROM: 최대 돛은 0..255 입니다.")
+            raise ValueError("함선 기본 성능: 최대 돛은 0~255 사이여야 합니다.")
         if not _in_range(lcrew_max, 0, 2550):
-            raise ValueError("Ship4 ROM: 최대 승무원(×10)은 0..2550 입니다.")
+            raise ValueError("함선 기본 성능: 최대 승무원은 0~2550 사이여야 합니다.")
         if not _in_range(dcrew, 0, 255):
-            raise ValueError("Ship4 ROM: 필요 승무원은 0..255 입니다.")
+            raise ValueError("함선 기본 성능: 필요 승무원은 0~255 사이여야 합니다.")
         if not _in_range(capacity, 0, 65535):
-            raise ValueError("Ship4 ROM: 최대 적재량은 0..65535 입니다.")
+            raise ValueError("함선 기본 성능: 최대 적재량은 0~65535 사이여야 합니다.")
         if not _in_range(lnowea, 0, 255):
-            raise ValueError("Ship4 ROM: 최대 무기수는 0..255 입니다.")
+            raise ValueError("함선 기본 성능: 최대 무기수는 0~255 사이여야 합니다.")
 
         try:
             base = self._current if self._current is not None else load_ship4_rom(
                 self._main_exe, self._idx
             )
         except Exception as e:
-            raise ValueError(f"Ship4 ROM 재읽기 실패: {e}")
+            raise ValueError(f"함선 기본 성능 다시 읽기 실패: {e}")
 
         ship4 = Ship4(
             lrudder=lrudder,
@@ -444,7 +444,7 @@ class _Ship4Panel(ttk.Frame):
         try:
             save_ship4_rom(self._main_exe, self._idx, ship4)
         except Exception as e:
-            raise ValueError(f"Ship4 ROM 저장 실패: {e}")
+            raise ValueError(f"함선 기본 성능 저장 실패: {e}")
         self._current = ship4
         self._loading = True
         try:
@@ -462,7 +462,7 @@ class _Ship4Panel(ttk.Frame):
         except ValueError as e:
             messagebox.showerror("저장 실패", str(e))
             return
-        messagebox.showinfo("저장 완료", f"Ship4 ROM (함선 {self._idx:02d}) 저장 완료.")
+        messagebox.showinfo("저장 완료", f"함선 기본 성능을 저장했습니다 (함선 {self._idx + 1}번).")
 
     # -------- 활성/비활성 --------
 
@@ -534,30 +534,30 @@ class _Ship5Panel(ttk.Frame):
         self._listbox.pack(side="left", fill="y", expand=True)
         sb.pack(side="right", fill="y")
         for i, name in enumerate(self._ship_names):
-            self._listbox.insert("end", f"{i:02d}. {name}")
+            self._listbox.insert("end", f"{i + 1}. {name}")
         self._listbox.bind("<<ListboxSelect>>", self._on_ship_selected)
 
         # 우측 폼
         right = ttk.Frame(self)
         right.pack(side="left", fill="both", expand=True)
 
-        form = ttk.LabelFrame(right, text="Ship5 ROM 필드", padding=8)
+        form = ttk.LabelFrame(right, text="함선 이름·모양", padding=8)
         form.pack(side="top", fill="x")
 
-        ttk.Label(form, text="배이름 (18 byte 한글)").grid(
+        ttk.Label(form, text="배 이름").grid(
             row=0, column=0, sticky="w", padx=4, pady=3
         )
         self._entry_name = ttk.Entry(form, textvariable=self._var_name, width=18)
         self._entry_name.grid(row=0, column=1, sticky="w", padx=4, pady=3)
 
-        ttk.Label(form, text="평상시 외형 (sform)").grid(
+        ttk.Label(form, text="평상시 모양").grid(
             row=1, column=0, sticky="w", padx=4, pady=3
         )
         ttk.Spinbox(
             form, from_=0, to=255, textvariable=self._var_sform, width=10
         ).grid(row=1, column=1, sticky="w", padx=4, pady=3)
 
-        ttk.Label(form, text="부울때 외형 (bform 상위 4비트)").grid(
+        ttk.Label(form, text="전투 시 모양").grid(
             row=2, column=0, sticky="w", padx=4, pady=3
         )
         ttk.Spinbox(
@@ -566,7 +566,7 @@ class _Ship5Panel(ttk.Frame):
 
         ttk.Label(
             form,
-            text="* 저장: (new & 0x0F) << 4 | (기존 bform & 0x0F). 하위 4비트는 보존.",
+            text="* 0~15 사이로 입력하세요.",
             foreground="#888",
         ).grid(row=3, column=0, columnspan=2, sticky="w", padx=4)
 
@@ -613,7 +613,7 @@ class _Ship5Panel(ttk.Frame):
         try:
             ship5 = load_ship5_rom(self._main_exe, self._idx)
         except Exception as e:
-            messagebox.showerror("Ship5 ROM 로드 실패", str(e))
+            messagebox.showerror("함선 이름·모양 불러오기 실패", str(e))
             return
         self._current = ship5
         self._var_name.set(decode_kr(ship5.name))
@@ -650,29 +650,29 @@ class _Ship5Panel(ttk.Frame):
             sform = int(self._var_sform.get())
             bform_hi = int(self._var_bform_hi.get())
         except (tk.TclError, ValueError):
-            raise ValueError("Ship5 ROM: 숫자 필드에 잘못된 값이 있습니다.")
+            raise ValueError("함선 이름·모양: 숫자 칸에 잘못된 값이 있습니다.")
         if not _in_range(sform, 0, 255):
-            raise ValueError("Ship5 ROM: 평상시 외형은 0..255 입니다.")
+            raise ValueError("함선 이름·모양: 평상시 모양은 0~255 사이여야 합니다.")
         if not _in_range(bform_hi, 0, 15):
-            raise ValueError("Ship5 ROM: 부울때 외형(상위 4비트)은 0..15 입니다.")
+            raise ValueError("함선 이름·모양: 전투 시 모양은 0~15 사이여야 합니다.")
         try:
             base = self._current if self._current is not None else load_ship5_rom(
                 self._main_exe, self._idx
             )
         except Exception as e:
-            raise ValueError(f"Ship5 ROM 재읽기 실패: {e}")
+            raise ValueError(f"함선 이름·모양 다시 읽기 실패: {e}")
         new_bform = ((bform_hi & 0x0F) << 4) | (base.bform & 0x0F)
         try:
             name_bytes = encode_kr_fixed(self._var_name.get(), 18)
         except Exception as e:
-            raise ValueError(f"Ship5 ROM: 배이름 인코딩 실패: {e}")
+            raise ValueError(f"함선 이름·모양: 배 이름을 저장할 수 없습니다: {e}")
         ship5 = Ship5(
             name=name_bytes, sform=sform, bform=new_bform, none=base.none,
         )
         try:
             save_ship5_rom(self._main_exe, self._idx, ship5)
         except Exception as e:
-            raise ValueError(f"Ship5 ROM 저장 실패: {e}")
+            raise ValueError(f"함선 이름·모양 저장 실패: {e}")
         self._current = ship5
         self._loading = True
         try:
@@ -690,7 +690,7 @@ class _Ship5Panel(ttk.Frame):
         except ValueError as e:
             messagebox.showerror("저장 실패", str(e))
             return
-        messagebox.showinfo("저장 완료", f"Ship5 ROM (함선 {self._idx:02d}) 저장 완료.")
+        messagebox.showinfo("저장 완료", f"함선 이름·모양을 저장했습니다 (함선 {self._idx + 1}번).")
 
     # -------- 활성/비활성 --------
 
@@ -742,11 +742,11 @@ def _cascade_state(widget: tk.Misc, st: str) -> None:
 def _decode_supply_byte_display(b: int) -> str:
     """공급 byte → 사람이 읽을 수 있는 표시."""
     if b == 0x2E:
-        return "'.' empty"
+        return "빈칸"
     if 0x2F <= b <= 0x39:
         level = b - 0x2F  # '/' = 0, '0' = 1, ..., '9' = 10
-        return f"'{chr(b)}' supply {level}"
-    return f"raw 0x{b:02X}"
+        return f"공급 {level}"
+    return f"(값 {b})"
 
 
 class _PortSupplyPanel(ttk.Frame):
@@ -827,11 +827,11 @@ class _PortSupplyPanel(ttk.Frame):
         sub_warn = ttk.Label(
             self,
             text=(
-                "⚠️ 사용자 검증 결과 (v0.4.8): 본 byte 를 어떻게 바꿔도 시장 가격 / 평균물가 % 에\n"
-                "    즉시적인 영향은 확인되지 않았습니다. 게임이 byte 자체는 사용 (1달 후 자동 갱신 확인)\n"
-                "    하지만 player-visible 한 메커닉은 미상. 평균물가 % 는 매월 1일에만 변동.\n"
-                "    상세: analysis_J §7. 표준 항구 (0..99) 는 byte 0x2E..0x39 범위가 안전.\n"
-                "    원거리 항구 (100..129) 는 구조 미해석 — 변경 시 게임 깨질 가능성 더 큼."
+                "⚠️ 확인 결과: 이 값을 바꿔도 시장 가격에 바로 영향이 나타나지 않았습니다.\n"
+                "    게임이 값을 읽긴 하지만(한 달 뒤 자동 갱신 확인) 실제 효과는 분명치 않습니다.\n"
+                "    평균물가는 매달 1일에만 바뀝니다.\n"
+                "    일반 항구(0~99번)는 안전한 범위가 있고,\n"
+                "    먼 바다 항구(100~129번)는 바꾸면 게임이 깨질 수 있습니다."
             ),
             foreground="#a00",
             justify="left",
@@ -841,7 +841,7 @@ class _PortSupplyPanel(ttk.Frame):
         # 좌측 항구 목록
         left = ttk.Frame(self)
         left.pack(side="left", fill="y", padx=(0, 8))
-        ttk.Label(left, text="항구 (130개):").pack(side="top", anchor="w")
+        ttk.Label(left, text="항구 (130곳):").pack(side="top", anchor="w")
         list_frame = ttk.Frame(left)
         list_frame.pack(side="top", fill="y", expand=True)
         self._listbox = tk.Listbox(
@@ -860,11 +860,11 @@ class _PortSupplyPanel(ttk.Frame):
         self._lbl_current = ttk.Label(right, text="(항구 미선택)", foreground="#444")
         self._lbl_current.pack(side="top", anchor="w", pady=(0, 6))
 
-        form = ttk.LabelFrame(right, text="공급 수치 (+14..+23, 10 byte)", padding=8)
+        form = ttk.LabelFrame(right, text="공급 수치", padding=8)
         form.pack(side="top", fill="x")
 
         for i in range(PORT_SUPPLY_SIZE):
-            ttk.Label(form, text=f"슬롯 {i}").grid(row=i, column=0, sticky="w", padx=4, pady=2)
+            ttk.Label(form, text=f"칸 {i + 1}").grid(row=i, column=0, sticky="w", padx=4, pady=2)
             sp = ttk.Spinbox(
                 form, from_=0, to=255, textvariable=self._vars[i], width=6,
             )
@@ -884,10 +884,10 @@ class _PortSupplyPanel(ttk.Frame):
         ttk.Label(
             right,
             text=(
-                "인코딩 (표준 항구 0..99 기준):\n"
-                "  '.' (0x2E) = 빈 슬롯, '/' (0x2F) = 공급 0 (가격 폭등),\n"
-                "  '0'..'9' (0x30..0x39) = 공급 1..10 (높을수록 가격 하락).\n"
-                "원거리 항구 (100..129) 는 위 인코딩이 아닙니다."
+                "입력 안내 (일반 항구 0~99번):\n"
+                "  '.' = 빈칸, '/' = 공급 0 (가격 폭등),\n"
+                "  '0'~'9' = 공급 1~10 (높을수록 가격 하락).\n"
+                "먼 바다 항구(100~129번)는 위 규칙이 적용되지 않습니다."
             ),
             foreground="#666",
             justify="left",
@@ -897,7 +897,7 @@ class _PortSupplyPanel(ttk.Frame):
         self._listbox.delete(0, "end")
         for i in range(NUM_PORTS):
             name = self._state.port_name[i] if 0 <= i < len(self._state.port_name) else ""
-            mark = "" if i < 100 else " [원거리]"
+            mark = "" if i < 100 else " (먼 바다)"
             self._listbox.insert("end", f"{i:3d}. {name}{mark}")
 
     # -------- 콜백 --------
@@ -935,7 +935,7 @@ class _PortSupplyPanel(ttk.Frame):
             messagebox.showerror("저장 실패", str(e))
             return
         name = self._state.port_name[self._idx] if 0 <= self._idx < len(self._state.port_name) else ""
-        messagebox.showinfo("저장 완료", f"항구 #{self._idx} ({name}) 공급 수치 저장 완료.")
+        messagebox.showinfo("저장 완료", f"{self._idx}번 항구 ({name}) 공급 수치를 저장했습니다.")
 
     def _on_var_write(self, *_a: object) -> None:
         if self._loading or not self._enabled:
@@ -962,16 +962,16 @@ class _PortSupplyPanel(ttk.Frame):
         try:
             raw = load_port_supply(self._state, self._idx)
         except Exception as e:
-            messagebox.showerror("공급 수치 로드 실패", str(e))
+            messagebox.showerror("공급 수치 불러오기 실패", str(e))
             return
         self._current_raw = raw
         for i, b in enumerate(raw):
             self._vars[i].set(b)
         name = self._state.port_name[self._idx] if 0 <= self._idx < len(self._state.port_name) else ""
-        category = "표준" if self._idx < 100 else "원거리 (구조 미해석)"
+        category = "일반" if self._idx < 100 else "먼 바다 (분석 미완)"
         std = "✓" if port_supply_is_standard(raw) else "✗"
         self._lbl_current.configure(
-            text=f"항구 #{self._idx}  {name}   [{category}, 표준 인코딩 {std}]"
+            text=f"{self._idx}번 항구  {name}   [{category}, 표준 형식 {std}]"
         )
         self._refresh_decoded_labels()
 

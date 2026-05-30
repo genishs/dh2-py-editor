@@ -56,7 +56,7 @@ class PortTab(ttk.Frame):
         self._build_right()
 
         self._hint = ttk.Label(
-            self, text="(슬롯을 먼저 선택하세요)", foreground="#888",
+            self, text="(세이브 칸을 먼저 선택하세요)", foreground="#888",
         )
         self._hint.grid(row=1, column=0, columnspan=2, pady=(8, 0))
 
@@ -122,7 +122,7 @@ class PortTab(ttk.Frame):
 
         ttk.Label(
             econ,
-            text="유효 범위: 0..65535 (게임 자연 범위는 약 0..1000).",
+            text="입력 범위: 0~65535 (게임에서 자연스러운 값은 약 0~1000).",
             foreground="#666",
         ).grid(row=2, column=0, columnspan=2, sticky="w", padx=2, pady=(4, 0))
 
@@ -133,10 +133,10 @@ class PortTab(ttk.Frame):
         ttk.Label(
             warn,
             text=(
-                "• 항구 경제 테이블 (analysis_I) 은 신규 발견 영역입니다.\n"
-                "• 리스본(0) 의 상업치는 페어웰(129) 의 mapX 좌표 4byte 와 데이터 영역이\n"
-                "  공유될 수 있어, 극단값 편집 시 지도가 깨질 수 있습니다.\n"
-                "• 편집 전 KOUKAI2.DAT 백업을 권장합니다."
+                "• 항구 경제 항목은 비교적 최근에 분석된 영역입니다.\n"
+                "• 일부 항구 값은 지도 좌표 정보와 저장 영역이 겹칠 수 있어,\n"
+                "  너무 큰 값으로 바꾸면 지도가 깨질 수 있습니다.\n"
+                "• 편집 전 저장 파일(KOUKAI2.DAT)을 복사해 두는 것을 권합니다."
             ),
             foreground="#a00",
             justify="left",
@@ -230,7 +230,7 @@ class PortTab(ttk.Frame):
         self._refresh_tree_row(self._port_idx, c, ind)
         name = self._state.port_name[self._port_idx] if 0 <= self._port_idx < len(self._state.port_name) else ""
         self._lbl_current.configure(
-            text=f"항구 #{self._port_idx}  {name}  (저장됨)"
+            text=f"{self._port_idx}번 항구  {name}  (저장됨)"
         )
         self._set_dirty(False)
 
@@ -291,7 +291,7 @@ class PortTab(ttk.Frame):
         self._var_commerce.set(c)
         self._var_industry.set(ind)
         name = self._state.port_name[idx] if 0 <= idx < len(self._state.port_name) else ""
-        self._lbl_current.configure(text=f"항구 #{idx}  {name}")
+        self._lbl_current.configure(text=f"{idx}번 항구  {name}")
 
     def _clear_form(self) -> None:
         self._var_commerce.set(0)

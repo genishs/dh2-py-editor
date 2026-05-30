@@ -119,7 +119,7 @@ class HeroTab(ttk.Frame):
 
         # 안내 라벨 (슬롯 미선택 시)
         self._hint = ttk.Label(
-            self, text="(슬롯을 먼저 선택하세요)", foreground="#888"
+            self, text="(세이브 칸을 먼저 선택하세요)", foreground="#888"
         )
         self._hint.grid(row=4, column=0, columnspan=4, pady=(8, 0))
 

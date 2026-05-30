@@ -154,7 +154,7 @@ class _FleetEditor(ttk.Frame):
     # ---------------- 빌드 ----------------
 
     def _build(self) -> None:
-        self._hint = ttk.Label(self, text="(슬롯을 먼저 선택하세요)", foreground="#888")
+        self._hint = ttk.Label(self, text="(세이브 칸을 먼저 선택하세요)", foreground="#888")
         self._hint.grid(row=0, column=0, columnspan=2, pady=8)
 
         # 좌: 함대 목록
@@ -475,7 +475,7 @@ class _FleetEditor(ttk.Frame):
         except ValueError:
             raise ValueError("나의 함대: 함선종류를 선택하세요.")
         if not (0 <= si < 25):
-            raise ValueError("나의 함대: 함선종류 인덱스가 범위를 벗어났습니다.")
+            raise ValueError("나의 함대: 함선종류 선택이 올바르지 않습니다.")
 
         ship_name_raw = encode_kr_fixed(self._var_ship_name.get(), 14)
 
@@ -499,13 +499,13 @@ class _FleetEditor(ttk.Frame):
         try:
             ship4 = load_ship4(self._state, si)
         except Exception as e:
-            raise ValueError(f"나의 함대: 선박 템플릿 로드 실패: {e}")
+            raise ValueError(f"나의 함대: 함선 기본 정보를 불러오지 못했습니다: {e}")
 
         if ship_type_changed:
             try:
                 ship5 = load_ship5(self._state, si)
             except Exception as e:
-                raise ValueError(f"나의 함대: 선박 템플릿(Ship5) 로드 실패: {e}")
+                raise ValueError(f"나의 함대: 함선 기본 정보를 불러오지 못했습니다: {e}")
             ship3.bform = ((ship5.bform & 0xF0) | (ship3.bform & 0x0F)) & 0xFF
 
         # 클램프 체인
@@ -631,7 +631,7 @@ class _OrgShipEditor(ttk.Frame):
     # ---------------- 빌드 ----------------
 
     def _build(self) -> None:
-        self._hint = ttk.Label(self, text="(슬롯을 먼저 선택하세요)", foreground="#888")
+        self._hint = ttk.Label(self, text="(세이브 칸을 먼저 선택하세요)", foreground="#888")
         self._hint.grid(row=0, column=0, columnspan=2, pady=8)
 
         # 좌: 25종 목록
@@ -655,8 +655,8 @@ class _OrgShipEditor(ttk.Frame):
         self._en_name.grid(row=r, column=1, sticky="w", padx=4, pady=4); r += 1
 
         # 2) 추진력 / 3) 선회력
-        self._sp_lsail = self._add_spinbox(right, r, "추진력 (lsail)", self._var_lsail, 0, 255); r += 1
-        self._sp_lrudder = self._add_spinbox(right, r, "선회력 (lrudder)", self._var_lrudder, 0, 255); r += 1
+        self._sp_lsail = self._add_spinbox(right, r, "추진력", self._var_lsail, 0, 255); r += 1
+        self._sp_lrudder = self._add_spinbox(right, r, "선회력", self._var_lrudder, 0, 255); r += 1
 
         # 4) 등장공업치 (kogyo) — record +0. 표시값 = 저장값 × 10.
         self._sp_kogyo = self._add_spinbox(right, r, "등장공업치", self._var_kogyo, 0, 2550); r += 1
@@ -673,7 +673,7 @@ class _OrgShipEditor(ttk.Frame):
         self._sp_lnowea = self._add_spinbox(right, r, "최대 포문수", self._var_lnowea, 0, 255); r += 1
 
         # 10) 선박 분류 (record +9) — 보기 전용. 다음 버전에서 편집 가능.
-        ttk.Label(right, text="선박 분류 (0..5, 보기 전용)").grid(
+        ttk.Label(right, text="선박 종류 (보기 전용)").grid(
             row=r, column=0, sticky="w", padx=4, pady=4
         )
         self._sp_ship_class = ttk.Spinbox(
@@ -814,7 +814,7 @@ class _OrgShipEditor(ttk.Frame):
             ship4 = load_ship4(self._state, sel)
             ship5 = load_ship5(self._state, sel)
         except Exception as e:
-            messagebox.showerror("템플릿 로드 실패", str(e))
+            messagebox.showerror("함선 기본 정보 불러오기 실패", str(e))
             return
 
         self._ship4 = ship4
@@ -829,7 +829,7 @@ class _OrgShipEditor(ttk.Frame):
             ship_class = load_record_ship_class(self._state, sel)
             price_disp = load_record_price(self._state, sel)
         except Exception as e:
-            messagebox.showerror("템플릿 로드 실패", f"record 읽기 실패: {e}")
+            messagebox.showerror("함선 기본 정보 불러오기 실패", f"함선 정보를 읽지 못했습니다: {e}")
             return
         self._loaded_kogyo = kogyo_stored
         self._loaded_lhull = lhull_val

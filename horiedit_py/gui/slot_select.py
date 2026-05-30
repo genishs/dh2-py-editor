@@ -48,11 +48,11 @@ class SlotSelectFrame(ttk.Frame):
         self.columnconfigure(0, weight=0)
         self.columnconfigure(1, weight=1)
 
-        # 좌측: 슬롯 Combobox
-        slots = ttk.LabelFrame(self, text="세이브 슬롯", padding=8)
+        # 좌측: 세이브 칸 Combobox
+        slots = ttk.LabelFrame(self, text="세이브 칸", padding=8)
         slots.grid(row=0, column=0, sticky="nsw", padx=(0, 4))
 
-        ttk.Label(slots, text="슬롯:").grid(
+        ttk.Label(slots, text="세이브 칸:").grid(
             row=0, column=0, sticky="w", padx=(0, 4), pady=2
         )
         self._cb_slot = ttk.Combobox(
@@ -65,8 +65,8 @@ class SlotSelectFrame(ttk.Frame):
         self._cb_slot.grid(row=0, column=1, sticky="w", padx=2, pady=2)
         self._cb_slot.bind("<<ComboboxSelected>>", self._on_combobox_changed)
 
-        # 우측: 선택한 슬롯 상세 (가로 충분히 확보)
-        detail = ttk.LabelFrame(self, text="선택한 슬롯", padding=8)
+        # 우측: 선택한 세이브 칸 상세 (가로 충분히 확보)
+        detail = ttk.LabelFrame(self, text="선택한 세이브 칸", padding=8)
         detail.grid(row=0, column=1, sticky="nsew", padx=(4, 0))
         detail.columnconfigure(1, weight=1)
 
@@ -125,7 +125,7 @@ class SlotSelectFrame(ttk.Frame):
             return
         try:
             init = slot_init(state, idx)
-            memo = decode_kr(init.memo).strip() or "(빈 슬롯)"
+            memo = decode_kr(init.memo).strip() or "(빈 칸)"
             port_idx = init.port
             port_name = ""
             if 0 <= port_idx < len(state.port_name):

@@ -43,7 +43,7 @@ class HullCapDialog(tk.Toplevel):
         self._var_cap = tk.IntVar(value=HULL_CAP_DEFAULT)
         self._editable_widgets: list[tk.Misc] = []
 
-        self.title("최대 내구도 수정 (MAIN.EXE)")
+        self.title("최대 내구도 상한 바꾸기")
         self.transient(parent)
         self.resizable(False, False)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -75,10 +75,10 @@ class HullCapDialog(tk.Toplevel):
         if self._main_exe is None:
             self._disk_caps = []
             self._lbl_main_exe.configure(
-                text="MAIN.EXE 를 찾지 못했습니다.", foreground="#a00"
+                text="게임 본체 파일(MAIN.EXE)을 찾지 못했습니다.", foreground="#a00"
             )
             self._lbl_found.configure(
-                text="KOUKAI2.DAT 와 MAIN.EXE 가 같이 있는 게임 폴더에서 실행하세요."
+                text="저장 파일과 게임이 함께 있는 게임 폴더에서 실행해 주세요."
             )
             self._lbl_current.configure(text="", foreground="#246")
             self._lbl_backup.configure(text="")
@@ -86,22 +86,21 @@ class HullCapDialog(tk.Toplevel):
             return
 
         self._lbl_main_exe.configure(
-            text=f"MAIN.EXE: {self._main_exe}", foreground="#246"
+            text=f"게임 본체 파일: {self._main_exe.name}", foreground="#246"
         )
         caps = load_hull_caps(self._main_exe)
         self._disk_caps = caps
 
         if not caps:
             self._lbl_found.configure(
-                text="이 빌드에서 신조 cap signature 를 찾지 못했습니다 (다른 버전 가능성)."
+                text="이 버전의 게임에서는 해당 항목을 찾지 못했습니다 (다른 버전일 수 있습니다)."
             )
             self._lbl_current.configure(text="", foreground="#246")
             self._set_enabled(False)
         else:
-            offsets_str = ", ".join(f"0x{o:05X}" for o, _ in caps)
             values = sorted(set(v for _, v in caps))
             self._lbl_found.configure(
-                text=f"발견된 cap 위치: {len(caps)} 곳 ({offsets_str})"
+                text=f"수정 가능한 위치 {len(caps)} 곳을 찾았습니다."
             )
             if len(values) == 1:
                 self._lbl_current.configure(
@@ -111,8 +110,8 @@ class HullCapDialog(tk.Toplevel):
             else:
                 self._lbl_current.configure(
                     text=(
-                        f"⚠ 위치별 값이 다름 ({', '.join(str(v) for v in values)}) — "
-                        "[패치 적용] 시 입력값으로 통일"
+                        f"⚠ 위치마다 값이 다릅니다 ({', '.join(str(v) for v in values)}) — "
+                        "[적용] 시 입력한 값으로 통일됩니다."
                     ),
                     foreground="#a60",
                 )
@@ -128,9 +127,9 @@ class HullCapDialog(tk.Toplevel):
         header = ttk.Label(
             outer,
             text=(
-                "조선소 신조 시 청구 내구력의 상한 (게임 기본 100) 을 변경합니다.\n"
-                "이 설정은 MAIN.EXE 만 수정하므로 세이브 슬롯과 무관합니다.\n"
-                "첫 [패치 적용] 시 MAIN.EXE.beforeHullCap 백업이 자동 생성됩니다."
+                "조선소에서 새 배를 만들 때의 최대 내구도 상한(게임 기본 100)을 바꿉니다.\n"
+                "이 설정은 게임 전체에 적용되며 세이브 칸과는 상관없습니다.\n"
+                "처음 [적용]할 때 원본 백업(MAIN.EXE.beforeHullCap)이 자동으로 만들어집니다."
             ),
             foreground="#246",
             justify="left",
@@ -152,7 +151,7 @@ class HullCapDialog(tk.Toplevel):
         )
         self._lbl_backup.pack(side="top", fill="x")
 
-        input_frame = ttk.LabelFrame(outer, text="최대 내구도 (1..255)", padding=8)
+        input_frame = ttk.LabelFrame(outer, text="최대 내구도 (1~255)", padding=8)
         input_frame.pack(side="top", fill="x", pady=4)
         self._sp_cap = ttk.Spinbox(
             input_frame, from_=1, to=255, textvariable=self._var_cap, width=10
@@ -160,14 +159,14 @@ class HullCapDialog(tk.Toplevel):
         self._sp_cap.pack(side="left", padx=4)
         ttk.Label(
             input_frame,
-            text="* 게임 기본값 100. 발견된 모든 cap 위치에 같은 값을 일괄 적용.",
+            text="* 게임 기본값은 100입니다. 찾은 모든 위치에 같은 값을 한 번에 적용합니다.",
             foreground="#666",
         ).pack(side="left", padx=8)
         self._editable_widgets.append(self._sp_cap)
 
         btns = ttk.Frame(outer)
         btns.pack(side="top", fill="x", pady=(12, 0))
-        self._btn_apply = ttk.Button(btns, text="패치 적용", command=self._on_apply)
+        self._btn_apply = ttk.Button(btns, text="적용", command=self._on_apply)
         self._btn_apply.pack(side="left", padx=4)
         self._btn_default = ttk.Button(
             btns, text="기본값 (100) 으로 입력", command=self._on_default
@@ -198,10 +197,10 @@ class HullCapDialog(tk.Toplevel):
             return
         backup = hull_cap_backup_path(self._main_exe)
         if backup.exists():
-            self._lbl_backup.configure(text=f"백업: {backup.name} (존재)")
+            self._lbl_backup.configure(text=f"백업 있음: {backup.name}")
         else:
             self._lbl_backup.configure(
-                text=f"백업: {backup.name} (아직 없음 — 첫 패치 시 자동 생성)"
+                text=f"백업 없음: {backup.name} (처음 적용할 때 자동 생성)"
             )
 
     # ---------------- 액션 ----------------
@@ -215,19 +214,19 @@ class HullCapDialog(tk.Toplevel):
             messagebox.showerror("입력 오류", "최대 내구도 값을 숫자로 입력하세요.", parent=self)
             return
         if not (1 <= val <= 255):
-            messagebox.showerror("입력 오류", "최대 내구도는 1..255 범위여야 합니다.", parent=self)
+            messagebox.showerror("입력 오류", "최대 내구도는 1~255 사이여야 합니다.", parent=self)
             return
         try:
             ensure_hull_cap_backup(self._main_exe)
             pairs = [(o, val) for o, _ in self._disk_caps]
             save_hull_caps(self._main_exe, pairs)
         except Exception as e:
-            messagebox.showerror("패치 실패", str(e), parent=self)
+            messagebox.showerror("적용 실패", str(e), parent=self)
             return
         messagebox.showinfo(
-            "패치 적용",
-            f"{len(self._disk_caps)} 곳에 최대 내구도 = {val} 적용.\n"
-            f"게임을 재실행해야 반영됩니다.",
+            "적용 완료",
+            f"{len(self._disk_caps)} 곳에 최대 내구도 {val}을(를) 적용했습니다.\n"
+            f"게임을 다시 실행해야 반영됩니다.",
             parent=self,
         )
         self.reload()
@@ -242,20 +241,20 @@ class HullCapDialog(tk.Toplevel):
         if not backup.exists():
             messagebox.showinfo(
                 "백업 없음",
-                f"{backup.name} 가 없습니다 — 아직 패치한 적이 없습니다.",
+                f"{backup.name} 가 없습니다 — 아직 적용한 적이 없습니다.",
                 parent=self,
             )
             return
         if not messagebox.askyesno(
             "백업에서 복원",
-            f"{backup.name} 로 MAIN.EXE 를 덮어씁니다. 진행할까요?",
+            f"백업({backup.name})으로 게임 본체 파일을 되돌립니다. 진행할까요?",
             parent=self,
         ):
             return
         if restore_hull_cap_backup(self._main_exe):
             messagebox.showinfo(
                 "복원 완료",
-                "MAIN.EXE 가 백업에서 복원되었습니다. 게임을 재실행해야 반영됩니다.",
+                "게임 본체 파일을 백업 상태로 되돌렸습니다. 게임을 다시 실행해야 반영됩니다.",
                 parent=self,
             )
             self.reload()
