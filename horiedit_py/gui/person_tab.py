@@ -349,11 +349,7 @@ class PersonTab(ttk.Frame):
         self._sp_pos.grid(row=2, column=1, sticky="w", padx=2, pady=2)
         ttk.Label(
             port_frame,
-            text=(
-                "소속을 직접 숫자로 바꾸는 고급 입력란입니다. 보통은 위의 [소속 변경] 목록을 쓰세요.\n"
-                "* 동료/모집 가능으로 바꾸면 게임에 필요한 값이 자동으로 맞춰집니다.\n"
-                "* 1~6번 주인공의 소속은 게임 진행 상태이므로 바꾸지 않는 것을 권합니다."
-            ),
+            text="* 고급: 보통은 위 [소속 변경] 목록을 쓰세요. 1~6번 주인공은 변경 비권장.",
             foreground="#888",
             justify="left",
         ).grid(row=3, column=0, columnspan=2, sticky="w", padx=2, pady=(0, 4))
@@ -375,23 +371,26 @@ class PersonTab(ttk.Frame):
         )
         self._lbl_port_hint.grid(row=5, column=0, columnspan=2, sticky="w", padx=2)
 
-        # 충성도 (none1, +43) — 동료의 충성도 추정값
-        ttk.Label(port_frame, text="충성도").grid(
-            row=6, column=0, sticky="w", padx=2, pady=2
-        )
+        # 충성도 (none1, +43) — 주인공 동료일 때만 표시 (그 외에는 의미 없음).
+        self._lbl_loyalty = ttk.Label(port_frame, text="충성도")
+        self._lbl_loyalty.grid(row=6, column=0, sticky="w", padx=2, pady=2)
         self._sp_loyalty = ttk.Spinbox(
             port_frame, from_=0, to=255, textvariable=self._var_loyalty, width=8
         )
         self._sp_loyalty.grid(row=6, column=1, sticky="w", padx=2, pady=2)
-        ttk.Label(
+        self._lbl_loyalty_hint = ttk.Label(
             port_frame,
-            text=(
-                "* 동료의 충성도 (0~255, 추정). 정상 동료는 보통 100.\n"
-                "* 동료/모집 가능으로 처음 바꾸면 0 일 때 자동으로 100 이 됩니다."
-            ),
+            text="* 동료의 충성도 (0~255). 정상 동료는 보통 100.",
             foreground="#888",
             justify="left",
-        ).grid(row=7, column=0, columnspan=2, sticky="w", padx=2, pady=(0, 4))
+        )
+        self._lbl_loyalty_hint.grid(
+            row=7, column=0, columnspan=2, sticky="w", padx=2, pady=(0, 4)
+        )
+        # 충성도 행 위젯 묶음 (동료 여부에 따라 표시/숨김)
+        self._loyalty_widgets = (
+            self._lbl_loyalty, self._sp_loyalty, self._lbl_loyalty_hint,
+        )
 
     # ---------------- dirty 처리 ----------------
 
@@ -422,6 +421,7 @@ class PersonTab(ttk.Frame):
             return
         # 항구 콤보 상태 + 디코드 라벨은 항상 갱신
         self._update_port_state()
+        self._update_loyalty_visibility()
         self._sync_pos_combo_from_var()
         self._refresh_affiliation_label()
         if not self._slot_loaded or self._person_idx is None:
@@ -742,6 +742,7 @@ class PersonTab(ttk.Frame):
             port_name = f"{port_idx}: {self._state.port_name[port_idx]}"
         self._var_port.set(port_name)
         self._update_port_state()
+        self._update_loyalty_visibility()
         self._refresh_affiliation_label()
 
         fname_s = decode_kr(p.fname)
@@ -914,6 +915,22 @@ class PersonTab(ttk.Frame):
                     "소속을 [항구 정착민]으로 바꾸면 항구를 고를 수 있습니다)"
                 )
             )
+
+    def _update_loyalty_visibility(self) -> None:
+        """충성도는 주인공 동료(pos = hero catalog ID)일 때만 표시."""
+        try:
+            cur_pos = int(self._var_pos.get())
+        except (tk.TclError, ValueError):
+            cur_pos = self._current_pos
+        is_companion = cur_pos in HERO_CATALOG_ID.values()
+        for w in self._loyalty_widgets:
+            try:
+                if is_companion:
+                    w.grid()
+                else:
+                    w.grid_remove()
+            except tk.TclError:
+                pass
 
     # ---------------- 폼 비우기 / 위젯 상태 ----------------
 
