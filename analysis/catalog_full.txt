@@ -1,0 +1,124 @@
+카탈로그 추정 길이: 120 records (CAT_START=0x03bbf2 .. 0x03d362)
+
+#  0 0x03bbf2 cid=  0 페레로 조안  none=00 00 exp_s=0 exp_b=0 none2=00 50 abil=1 none3=96
+#  1 0x03bc24 cid= 10 에란초 카탈리나  none=01 00 exp_s=190 exp_b=170 none2=00 e1 abil=4 none3=97
+#  2 0x03bc56 cid= 30 스피노라 옷토  none=02 00 exp_s=140 exp_b=210 none2=00 d1 abil=4 none3=99
+#  3 0x03bc88 cid= 50 로페스 에르네스트  none=03 00 exp_s=120 exp_b=0 none2=00 e0 abil=24 none3=101
+#  4 0x03bcba cid= 40 콘티 피에트로  none=04 00 exp_s=110 exp_b=0 none2=00 51 abil=16 none3=100
+#  5 0x03bcec cid= 20 베자스 알  none=05 00 exp_s=0 exp_b=0 none2=00 c1 abil=3 none3=98
+#  6 0x03bd1e cid=  1 세게이라 시몬  none=3d 00 exp_s=235 exp_b=288 none2=01 71 abil=27 none3=32
+#  7 0x03bd50 cid=  2 코스타 루이  none=3e 00 exp_s=127 exp_b=95 none2=01 10 abil=22 none3=32
+#  8 0x03bd82 cid=  3 핀트 로렌소  none=24 c8 exp_s=128 exp_b=180 none2=01 61 abil=2 none3=32
+#  9 0x03bdb4 cid=  4 페레이라 로포  none=be d8 exp_s=190 exp_b=114 none2=01 90 abil=17 none3=32
+# 10 0x03bde6 cid=  5 셀란 라파엘  none=3f 00 exp_s=221 exp_b=158 none2=01 11 abil=20 none3=32
+# 11 0x03be18 cid=  6 소사 디에고  none=85 e7 exp_s=241 exp_b=105 none2=01 f0 abil=4 none3=96
+# 12 0x03be4a cid=  7 안드레드 알퐁소  none=e2 ca exp_s=115 exp_b=16 none2=01 20 abil=16 none3=32
+# 13 0x03be7c cid=  8 알바레스 가르시아  none=40 00 exp_s=32 exp_b=227 none2=01 d0 abil=28 none3=32
+# 14 0x03beae cid=  9 실베이라 곤사로  none=6c fd exp_s=241 exp_b=142 none2=01 10 abil=0 none3=96
+# 15 0x03bee0 cid= 11 오르테가 에스테반  none=41 00 exp_s=105 exp_b=1 none2=01 90 abil=23 none3=33
+# 16 0x03bf12 cid= 12 페론 스테판  none=d6 ec exp_s=175 exp_b=182 none2=01 d1 abil=17 none3=33
+# 17 0x03bf44 cid= 13 아기레 페론소  none=af f2 exp_s=122 exp_b=203 none2=01 f0 abil=2 none3=33
+# 18 0x03bf76 cid= 14 오리드 발보아  none=42 00 exp_s=21 exp_b=234 none2=01 b0 abil=23 none3=97
+# 19 0x03bfa8 cid= 15 포르툰드 제곱  none=43 00 exp_s=122 exp_b=241 none2=01 f1 abil=28 none3=33
+# 20 0x03bfda cid= 16 몬카다 우고  none=44 00 exp_s=94 exp_b=38 none2=01 71 abil=20 none3=33
+# 21 0x03c00c cid= 17 나발로 페드로  none=53 e9 exp_s=135 exp_b=163 none2=01 d0 abil=0 none3=33
+# 22 0x03c03e cid= 18 로요라 베르나르  none=91 df exp_s=92 exp_b=119 none2=01 b1 abil=20 none3=97
+# 23 0x03c070 cid= 19 베리오 에르난  none=45 00 exp_s=217 exp_b=94 none2=01 91 abil=20 none3=97
+# 24 0x03c0a2 cid= 21 카이브 우즌  none=49 d6 exp_s=196 exp_b=107 none2=01 e0 abil=19 none3=34
+# 25 0x03c0d4 cid= 22 야사르 이스칼  none=f2 ed exp_s=3 exp_b=49 none2=01 41 abil=3 none3=34
+# 26 0x03c106 cid= 23 룸루 카라  none=46 00 exp_s=122 exp_b=186 none2=01 40 abil=27 none3=98
+# 27 0x03c138 cid= 24 쉰 다라  none=47 00 exp_s=203 exp_b=240 none2=01 40 abil=19 none3=34
+# 28 0x03c16a cid= 25 파샤 쉬나인  none=48 00 exp_s=48 exp_b=196 none2=01 e1 abil=28 none3=98
+# 29 0x03c19c cid= 26 케말 거쉰  none=49 00 exp_s=25 exp_b=157 none2=01 60 abil=20 none3=98
+# 30 0x03c1ce cid= 27 무히딘 아프멧  none=f2 da exp_s=60 exp_b=112 none2=01 20 abil=20 none3=98
+# 31 0x03c200 cid= 28 고브데 사림  none=bc c1 exp_s=260 exp_b=293 none2=01 41 abil=0 none3=98
+# 32 0x03c232 cid= 29 미르자 다니엘  none=4a 00 exp_s=61 exp_b=251 none2=01 00 abil=20 none3=34
+# 33 0x03c264 cid= 31 이스트만 조셉  none=4b 00 exp_s=112 exp_b=283 none2=01 71 abil=27 none3=35
+# 34 0x03c296 cid= 32 그레샴 토마스  none=e9 e6 exp_s=9 exp_b=97 none2=01 80 abil=17 none3=35
+# 35 0x03c2c8 cid= 33 로우 알프레드  none=4c 00 exp_s=181 exp_b=88 none2=01 f0 abil=26 none3=99
+# 36 0x03c2fa cid= 34 하베이 에드문드  none=eb c1 exp_s=153 exp_b=215 none2=01 e0 abil=1 none3=35
+# 37 0x03c32c cid= 35 와일드 로버트  none=4d 00 exp_s=36 exp_b=64 none2=01 d1 abil=28 none3=35
+# 38 0x03c35e cid= 36 러셀 빅터  none=4e 00 exp_s=227 exp_b=34 none2=01 01 abil=20 none3=99
+# 39 0x03c390 cid= 37 크라이브 윌리암  none=b3 cb exp_s=81 exp_b=116 none2=01 b1 abil=20 none3=35
+# 40 0x03c3c2 cid= 38 로렌스 월터  none=a6 ee exp_s=210 exp_b=56 none2=01 00 abil=0 none3=35
+# 41 0x03c3f4 cid= 39 그라프튼 찰스  none=db d2 exp_s=231 exp_b=133 none2=01 90 abil=20 none3=35
+# 42 0x03c426 cid= 41 벤소 구이드  none=4f 00 exp_s=46 exp_b=44 none2=01 71 abil=29 none3=36
+# 43 0x03c458 cid= 42 루드윅스 조셉페  none=3c d5 exp_s=160 exp_b=207 none2=01 91 abil=17 none3=100
+# 44 0x03c48a cid= 43 사보나로라 카미로  none=88 fe exp_s=257 exp_b=295 none2=01 50 abil=1 none3=36
+# 45 0x03c4bc cid= 44 베세리스 조반니  none=50 00 exp_s=57 exp_b=216 none2=01 b0 abil=29 none3=36
+# 46 0x03c4ee cid= 45 그리마니 안드레아  none=51 00 exp_s=241 exp_b=214 none2=01 d1 abil=4 none3=36
+# 47 0x03c520 cid= 46 카르도치 가브리엘  none=0c f9 exp_s=263 exp_b=85 none2=01 91 abil=20 none3=100
+# 48 0x03c552 cid= 47 발바리고 아코스타  none=3e cf exp_s=140 exp_b=141 none2=01 f0 abil=28 none3=36
+# 49 0x03c584 cid= 48 도리아 안드레아  none=52 00 exp_s=133 exp_b=260 none2=01 51 abil=28 none3=36
+# 50 0x03c5b6 cid= 49 바스케스 호안  none=99 c0 exp_s=0 exp_b=121 none2=01 90 abil=0 none3=100
+# 51 0x03c5e8 cid= 51 올잭 휴고  none=53 00 exp_s=297 exp_b=144 none2=01 b1 abil=27 none3=37
+# 52 0x03c61a cid= 52 그로티스 크리스찬  none=24 c1 exp_s=62 exp_b=11 none2=01 c0 abil=26 none3=101
+# 53 0x03c64c cid= 53 휴이겐 유리스  none=5e f0 exp_s=103 exp_b=247 none2=01 31 abil=19 none3=101
+# 54 0x03c67e cid= 54 라이덴 모리스  none=0e c4 exp_s=69 exp_b=13 none2=01 60 abil=26 none3=37
+# 55 0x03c6b0 cid= 55 웬후크 피에토르  none=1d c9 exp_s=273 exp_b=233 none2=01 31 abil=16 none3=37
+# 56 0x03c6e2 cid= 56 헤인 빌렘  none=54 00 exp_s=137 exp_b=9 none2=01 61 abil=28 none3=101
+# 57 0x03c714 cid= 57 페르메르 줄리안  none=55 00 exp_s=82 exp_b=142 none2=01 30 abil=16 none3=37
+# 58 0x03c746 cid= 58 핸드릭 코르네리스  none=07 cd exp_s=71 exp_b=199 none2=01 00 abil=28 none3=37
+# 59 0x03c778 cid= 59 브룸 잭스  none=56 00 exp_s=10 exp_b=36 none2=01 50 abil=28 none3=101
+# 60 0x03c7aa cid= 60 칸 안토니오  none=57 00 exp_s=153 exp_b=71 none2=01 32 abil=0 none3=32
+# 61 0x03c7dc cid= 62 루글란 피에르  none=b8 cd exp_s=0 exp_b=279 none2=01 32 abil=16 none3=38
+# 62 0x03c80e cid= 63 스콧트 루이스  none=47 d5 exp_s=242 exp_b=61 none2=01 12 abil=20 none3=38
+# 63 0x03c840 cid= 64 데이비스 존  none=df d4 exp_s=88 exp_b=192 none2=01 32 abil=0 none3=38
+# 64 0x03c872 cid= 65 레이스 하이레딘  none=58 00 exp_s=251 exp_b=115 none2=01 f2 abil=28 none3=38
+# 65 0x03c8a4 cid= 66 레이스 아이딘  none=59 00 exp_s=150 exp_b=194 none2=01 72 abil=4 none3=38
+# 66 0x03c8d6 cid= 67 샤룩 마호메드  none=5a 00 exp_s=205 exp_b=290 none2=01 f1 abil=28 none3=38
+# 67 0x03c908 cid= 68 아리 울구  none=5b 00 exp_s=64 exp_b=83 none2=01 f2 abil=28 none3=102
+# 68 0x03c93a cid= 69 라캄 잭  none=b3 f9 exp_s=271 exp_b=47 none2=01 12 abil=0 none3=38
+# 69 0x03c96c cid=254 알렘켈 로코  none=1f 00 exp_s=200 exp_b=310 none2=00 d0 abil=20 none3=96
+# 70 0x03c99e cid=254 마리오네 엔리코  none=20 00 exp_s=0 exp_b=0 none2=00 d0 abil=2 none3=96
+# 71 0x03c9d0 cid=254 마나나 도밍고  none=21 00 exp_s=0 exp_b=0 none2=00 c0 abil=1 none3=96
+# 72 0x03ca02 cid=254 사누드 프랑코  none=22 00 exp_s=140 exp_b=20 none2=00 f1 abil=20 none3=97
+# 73 0x03ca34 cid=254 기지 안드레아  none=23 00 exp_s=20 exp_b=200 none2=00 72 abil=20 none3=97
+# 74 0x03ca66 cid=254 길버트 에드먼드  none=1a 00 exp_s=0 exp_b=0 none2=00 a2 abil=0 none3=99
+# 75 0x03ca98 cid=254 로이 마슈  none=24 00 exp_s=90 exp_b=120 none2=00 51 abil=20 none3=99
+# 76 0x03caca cid=254 스테파노 카미로  none=26 00 exp_s=80 exp_b=30 none2=00 d1 abil=18 none3=100
+# 77 0x03cafc cid=254 스탓텐 로이드  none=27 00 exp_s=40 exp_b=10 none2=00 70 abil=16 none3=101
+# 78 0x03cb2e cid=254 사림 자한  none=28 00 exp_s=30 exp_b=120 none2=00 40 abil=20 none3=98
+# 79 0x03cb60 cid=255 레이스 필리  none=29 00 exp_s=300 exp_b=80 none2=00 e0 abil=31 none3=34
+# 80 0x03cb92 cid=255 그라니에 하프멧  none=30 00 exp_s=37 exp_b=72 none2=00 c0 abil=0 none3=98
+# 81 0x03cbc4 cid=255 파시 알  none=12 ed exp_s=229 exp_b=140 none2=00 81 abil=2 none3=34
+# 82 0x03cbf6 cid=255 베이 자가노스  none=31 00 exp_s=292 exp_b=227 none2=00 a1 abil=3 none3=98
+# 83 0x03cc28 cid=255 핀트 페르난  none=2a 00 exp_s=274 exp_b=52 none2=00 70 abil=24 none3=96
+# 84 0x03cc5a cid=255 카스트로 조안  none=4d c7 exp_s=139 exp_b=164 none2=00 91 abil=0 none3=32
+# 85 0x03cc8c cid=255 레아르 미구엘  none=2c 00 exp_s=275 exp_b=140 none2=00 c0 abil=21 none3=96
+# 86 0x03ccbe cid=255 파군데스 디오고  none=c9 cd exp_s=131 exp_b=255 none2=00 31 abil=0 none3=96
+# 87 0x03ccf0 cid=255 페레이라 달테  none=2b 00 exp_s=107 exp_b=58 none2=00 d1 abil=16 none3=96
+# 88 0x03cd22 cid=255 페레스토레로 마누엘  none=44 e4 exp_s=286 exp_b=41 none2=00 31 abil=0 none3=96
+# 89 0x03cd54 cid=255 알바레스 프란시스코  none=bc e6 exp_s=183 exp_b=10 none2=00 90 abil=4 none3=96
+# 90 0x03cd86 cid=255 파레이로 루이  none=8c c2 exp_s=148 exp_b=40 none2=00 f1 abil=16 none3=96
+# 91 0x03cdb8 cid=255 코사 판  none=2e 00 exp_s=129 exp_b=114 none2=00 60 abil=0 none3=33
+# 92 0x03cdea cid=255 발보아 마르틴  none=a6 e6 exp_s=70 exp_b=154 none2=00 70 abil=21 none3=97
+# 93 0x03ce1c cid=255 고메스 베르나르도  none=2f 00 exp_s=255 exp_b=150 none2=00 f1 abil=26 none3=97
+# 94 0x03ce4e cid=255 베라스케스 디에고  none=2d 00 exp_s=276 exp_b=228 none2=00 31 abil=17 none3=33
+# 95 0x03ce80 cid=255 오리드 판피로  none=20 f0 exp_s=209 exp_b=272 none2=00 12 abil=20 none3=33
+# 96 0x03ceb2 cid=255 멘도사 아론소  none=04 dd exp_s=135 exp_b=101 none2=00 e1 abil=0 none3=33
+# 97 0x03cee4 cid=255 존슨 안소니  none=33 00 exp_s=272 exp_b=247 none2=00 d0 abil=20 none3=99
+# 98 0x03cf16 cid=255 에드워드 로렌스  none=32 00 exp_s=263 exp_b=185 none2=00 c1 abil=5 none3=99
+# 99 0x03cf48 cid=255 핏치 라울  none=34 00 exp_s=208 exp_b=69 none2=00 71 abil=18 none3=35
+#100 0x03cf7a cid=255 샤리 안토니  none=5b fa exp_s=275 exp_b=108 none2=00 b1 abil=0 none3=99
+#101 0x03cfac cid=255 조반니 알로이지  none=35 00 exp_s=193 exp_b=290 none2=00 70 abil=17 none3=36
+#102 0x03cfde cid=255 람지오 장  none=36 00 exp_s=265 exp_b=156 none2=00 10 abil=0 none3=36
+#103 0x03d010 cid=255 스테파노 니콜로  none=37 00 exp_s=198 exp_b=17 none2=00 51 abil=16 none3=100
+#104 0x03d042 cid=255 밧조 알렉산드  none=7e f6 exp_s=38 exp_b=90 none2=00 c0 abil=4 none3=36
+#105 0x03d074 cid=255 스키랏치 알베로  none=0a c5 exp_s=43 exp_b=168 none2=00 50 abil=0 none3=36
+#106 0x03d0a6 cid=255 쇼텐 코넬리우스  none=38 d2 exp_s=169 exp_b=206 none2=00 81 abil=0 none3=101
+#107 0x03d0d8 cid=255 에인거 암브로이즈  none=25 fb exp_s=93 exp_b=76 none2=00 d0 abil=0 none3=101
+#108 0x03d10a cid=255 슈파이야 게오르그  none=38 00 exp_s=237 exp_b=205 none2=00 01 abil=16 none3=101
+#109 0x03d13c cid=255 슈타텐 한스  none=39 00 exp_s=64 exp_b=14 none2=00 91 abil=24 none3=37
+#110 0x03d16e cid=255 울웨이크 야곱  none=3a 00 exp_s=0 exp_b=60 none2=00 72 abil=2 none3=101
+#111 0x03d1a0 cid=255 알퐁스 장  none=1f de exp_s=101 exp_b=293 none2=00 32 abil=4 none3=38
+#112 0x03d1d2 cid=255 핀데아도 안토니오  none=5e ee exp_s=127 exp_b=37 none2=00 32 abil=0 none3=38
+#113 0x03d204 cid=255 페델리티 체자레  none=d4 da exp_s=68 exp_b=216 none2=00 32 abil=4 none3=102
+#114 0x03d236 cid= 61 로로노아 프란차  none=cc e3 exp_s=226 exp_b=99 none2=00 32 abil=20 none3=102
+#115 0x03d268 cid=255 만스펠 헨리  none=fd eb exp_s=280 exp_b=150 none2=00 32 abil=4 none3=38
+#116 0x03d29a cid=255 핏셔 개빈  none=e3 fc exp_s=120 exp_b=50 none2=00 51 abil=4 none3=102
+#117 0x03d2cc cid=255 단피어 에드워드  none=97 ff exp_s=155 exp_b=191 none2=00 32 abil=20 none3=102
+#118 0x03d2fe cid=255 로우 로버트  none=3c 00 exp_s=0 exp_b=161 none2=00 71 abil=20 none3=102
+#119 0x03d330 cid=255 헉슬리 리차드  none=f6 ff exp_s=110 exp_b=25 none2=00 32 abil=4 none3=102
+#120 0x03d362 cid=179  집사 마르코  <비이름>  none=ba 20 exp_s=7 exp_b=8713 none2=20 c0 abil=235 none3=0
+#121 0x03d394 cid=179 모데나공 호안   <비이름>  none=00 00 exp_s=42421 exp_b=47805 none2=f6 00 abil=0 none3=0

@@ -1,0 +1,299 @@
+
+=== 사누드 프랑코  (catalog #72) ===
+        field |  CATALOG |     SAVE
+    none(+26) |     2200 |     2200
+      command |       71 |       71
+         sail |       55 |       55
+         know |       40 |       40
+        hunch |       43 |       43
+         tool |       79 |       79
+        sword |       80 |       80
+        charm |       65 |       65
+        death |       70 |       70
+       l_sail |        8 |        8
+     l_battle |       11 |       11
+     exp_sail |      140 |     1224   <diff>
+   exp_battle |       20 |       20
+          age |       20 |       20
+        none1 |      100 |      100
+          pos |      254 |       10   <diff>
+         port |      255 |      255
+      ability |       20 |       20
+        none3 |       97 |      225   <diff>
+   none2(+46) |     00f1 |     06f1
+
+=== 기지 안드레아  (catalog #73) ===
+        field |  CATALOG |     SAVE
+    none(+26) |     2300 |     2300
+      command |       70 |       70
+         sail |       44 |       44
+         know |       32 |       32
+        hunch |       60 |       60
+         tool |       95 |       95
+        sword |       82 |       82
+        charm |       70 |       70
+        death |       80 |       80
+       l_sail |        9 |        9
+     l_battle |       15 |       15
+     exp_sail |       20 |      689   <diff>
+   exp_battle |      200 |      200
+          age |       26 |       26
+        none1 |      100 |      100
+          pos |      254 |       10   <diff>
+         port |      255 |      255
+      ability |       20 |       20
+        none3 |       97 |      225   <diff>
+   none2(+46) |     0072 |     0672
+
+=== 그라니에 하프멧  (catalog #80) ===
+        field |  CATALOG |     SAVE
+    none(+26) |     3000 |     3000
+      command |       82 |       89   <diff>
+         sail |       79 |       89   <diff>
+         know |       53 |       62   <diff>
+        hunch |       78 |       80   <diff>
+         tool |       83 |       83
+        sword |       58 |       58
+        charm |       66 |       66
+        death |       88 |       88
+       l_sail |        1 |        4   <diff>
+     l_battle |        1 |        1
+     exp_sail |       37 |      161   <diff>
+   exp_battle |       72 |       72
+          age |       27 |       27
+        none1 |        0 |       33   <diff>
+          pos |      255 |       10   <diff>
+         port |       18 |      255   <diff>
+      ability |        0 |        0
+        none3 |       98 |       98
+   none2(+46) |     00c0 |     06c0
+
+=== 베이 자가노스  (catalog #82) ===
+        field |  CATALOG |     SAVE
+    none(+26) |     3100 |     3100
+      command |       51 |       55   <diff>
+         sail |       58 |       59   <diff>
+         know |       87 |       89   <diff>
+        hunch |       82 |       83   <diff>
+         tool |       61 |       61
+        sword |       88 |       88
+        charm |       61 |       61
+        death |       73 |       73
+       l_sail |        2 |        4   <diff>
+     l_battle |        1 |        1
+     exp_sail |      292 |      445   <diff>
+   exp_battle |      227 |      227
+          age |       35 |       35
+        none1 |        0 |       33   <diff>
+          pos |      255 |       10   <diff>
+         port |       75 |      255   <diff>
+      ability |        3 |        3
+        none3 |       98 |       98
+   none2(+46) |     00a1 |     04a1
+
+=== 레아르 미구엘  (catalog #85) ===
+        field |  CATALOG |     SAVE
+    none(+26) |     2c00 |     2c00
+      command |       84 |       84
+         sail |       73 |       73
+         know |       77 |       77
+        hunch |       84 |       84
+         tool |       84 |       84
+        sword |       54 |       54
+        charm |       86 |       86
+        death |       64 |       64
+       l_sail |        7 |        7
+     l_battle |        6 |        6
+     exp_sail |      275 |      654   <diff>
+   exp_battle |      140 |      140
+          age |       34 |       34
+        none1 |        0 |       38   <diff>
+          pos |      255 |       10   <diff>
+         port |        0 |      255   <diff>
+      ability |       21 |       21
+        none3 |       96 |       96
+   none2(+46) |     00c0 |     06c0
+
+=== 코사 판  (catalog #91) ===
+        field |  CATALOG |     SAVE
+    none(+26) |     2e00 |     2e00
+      command |       87 |       87
+         sail |       87 |       87
+         know |       52 |       52
+        hunch |       74 |       74
+         tool |       82 |       82
+        sword |       85 |       85
+        charm |       72 |       72
+        death |       65 |       65
+       l_sail |        1 |        1
+     l_battle |        2 |        2
+     exp_sail |      129 |      129
+   exp_battle |      114 |      114
+          age |       36 |       36
+        none1 |        0 |       10   <diff>
+          pos |      255 |       10   <diff>
+         port |        3 |      255   <diff>
+      ability |        0 |        0
+        none3 |       33 |       33
+   none2(+46) |     0060 |     0660
+
+=== 존슨 안소니  (catalog #97) ===
+        field |  CATALOG |     SAVE
+    none(+26) |     3300 |     3300
+      command |       62 |       64   <diff>
+         sail |       66 |       72   <diff>
+         know |       76 |       82   <diff>
+        hunch |       84 |       88   <diff>
+         tool |       89 |       89
+        sword |       67 |       67
+        charm |       72 |       72
+        death |       54 |       54
+       l_sail |        2 |        4   <diff>
+     l_battle |        3 |        3
+     exp_sail |      272 |      383   <diff>
+   exp_battle |      247 |      247
+          age |       19 |       19
+        none1 |        0 |       59   <diff>
+          pos |      255 |       10   <diff>
+         port |       16 |      255   <diff>
+      ability |       20 |       20
+        none3 |       99 |       99
+   none2(+46) |     00d0 |     06d0
+
+=== 에드워드 로렌스  (catalog #98) ===
+        field |  CATALOG |     SAVE
+    none(+26) |     3200 |     3200
+      command |       51 |       51
+         sail |       88 |       88
+         know |       84 |       84
+        hunch |       66 |       66
+         tool |       62 |       62
+        sword |       52 |       52
+        charm |       79 |       79
+        death |       60 |       60
+       l_sail |        7 |        7
+     l_battle |        9 |        9
+     exp_sail |      263 |     1101   <diff>
+   exp_battle |      185 |      185
+          age |       31 |       31
+        none1 |        0 |       64   <diff>
+          pos |      255 |       10   <diff>
+         port |       29 |      255   <diff>
+      ability |        5 |        5
+        none3 |       99 |      227   <diff>
+   none2(+46) |     00c1 |     06c1
+
+=== 핏치 라울  (catalog #99) ===
+        field |  CATALOG |     SAVE
+    none(+26) |     3400 |     3400
+      command |       85 |       94   <diff>
+         sail |       76 |       81   <diff>
+         know |       51 |       61   <diff>
+        hunch |       63 |       68   <diff>
+         tool |       73 |       73
+        sword |       74 |       74
+        charm |       84 |       84
+        death |       63 |       63
+       l_sail |        2 |        6   <diff>
+     l_battle |        1 |        1
+     exp_sail |      208 |      264   <diff>
+   exp_battle |       69 |       69
+          age |       23 |       23
+        none1 |        0 |      100   <diff>
+          pos |      255 |       10   <diff>
+         port |       29 |      255   <diff>
+      ability |       18 |       18
+        none3 |       35 |      163   <diff>
+   none2(+46) |     0071 |     0371
+
+=== 쇼텐 코넬리우스  (catalog #106) ===
+        field |  CATALOG |     SAVE
+    none(+26) |     38d2 |     38d2
+      command |       75 |       76   <diff>
+         sail |       61 |       64   <diff>
+         know |       76 |       78   <diff>
+        hunch |       80 |       82   <diff>
+         tool |       53 |       53
+        sword |       62 |       62
+        charm |       88 |       88
+        death |       56 |       56
+       l_sail |        5 |        6   <diff>
+     l_battle |        6 |        6
+     exp_sail |      169 |      254   <diff>
+   exp_battle |      206 |      206
+          age |       31 |       31
+        none1 |        0 |       54   <diff>
+          pos |      255 |       10   <diff>
+         port |       33 |      255   <diff>
+      ability |        0 |        0
+        none3 |      101 |      229   <diff>
+   none2(+46) |     0081 |     0581
+
+=== 슈타텐 한스  (catalog #109) ===
+        field |  CATALOG |     SAVE
+    none(+26) |     3900 |     3900
+      command |       82 |       82
+         sail |       57 |       57
+         know |       52 |       52
+        hunch |       51 |       51
+         tool |       57 |       57
+        sword |       86 |       86
+        charm |       84 |       84
+        death |       50 |       50
+       l_sail |        7 |        7
+     l_battle |        9 |        9
+     exp_sail |       64 |      899   <diff>
+   exp_battle |       14 |       14
+          age |       38 |       38
+        none1 |        0 |       78   <diff>
+          pos |      255 |       10   <diff>
+         port |       33 |      255   <diff>
+      ability |       24 |       24
+        none3 |       37 |      165   <diff>
+   none2(+46) |     0091 |     0691
+
+=== 울웨이크 야곱  (catalog #110) ===
+        field |  CATALOG |     SAVE
+    none(+26) |     3a00 |     3a00
+      command |       64 |       68   <diff>
+         sail |       52 |       54   <diff>
+         know |       82 |       84   <diff>
+        hunch |       53 |       55   <diff>
+         tool |       88 |       88
+        sword |       77 |       77
+        charm |       67 |       67
+        death |       51 |       51
+       l_sail |        5 |        6   <diff>
+     l_battle |        3 |        3
+     exp_sail |        0 |       97   <diff>
+   exp_battle |       60 |       60
+          age |       18 |       18
+        none1 |        0 |       78   <diff>
+          pos |      255 |       10   <diff>
+         port |       27 |      255   <diff>
+      ability |        2 |        2
+        none3 |      101 |      229   <diff>
+   none2(+46) |     0072 |     0672
+
+=== 핏셔 개빈  (catalog #116) ===
+        field |  CATALOG |     SAVE
+    none(+26) |     e3fc |     e3fc
+      command |       69 |       80   <diff>
+         sail |       87 |      100   <diff>
+         know |       73 |       92   <diff>
+        hunch |       59 |       69   <diff>
+         tool |       81 |       86   <diff>
+        sword |       72 |       75   <diff>
+        charm |       76 |       76
+        death |       72 |       72
+       l_sail |        1 |        6   <diff>
+     l_battle |        1 |        5   <diff>
+     exp_sail |      120 |       60   <diff>
+   exp_battle |       50 |      356   <diff>
+          age |       29 |       29
+        none1 |        0 |      100   <diff>
+          pos |      255 |       10   <diff>
+         port |       35 |      255   <diff>
+      ability |        4 |        4
+        none3 |      102 |      230   <diff>
+   none2(+46) |     0051 |     0251
