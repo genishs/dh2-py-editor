@@ -46,6 +46,14 @@ if ($LASTEXITCODE -ne 0) {
     }
 }
 
+# Generate version resource (unsigned exe reputation hint)
+Write-Host "Generating version resource..." -ForegroundColor Cyan
+& $pythonCmd build_version_info.py buildersion_info.txt
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "version resource generation failed." -ForegroundColor Red
+    exit 1
+}
+
 # 빌드 실행
 Write-Host "PyInstaller 빌드 중..." -ForegroundColor Cyan
 & $pythonCmd -m PyInstaller `
@@ -54,6 +62,7 @@ Write-Host "PyInstaller 빌드 중..." -ForegroundColor Cyan
     --name koukai2_editor `
     --icon assets\icon.ico `
     --add-data "assets\icon.ico;assets" `
+    --version-file buildersion_info.txt `
     --noconfirm `
     --clean `
     koukai2_editor.py

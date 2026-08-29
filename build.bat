@@ -56,9 +56,17 @@ if %ERRORLEVEL% NEQ 0 (
     )
 )
 
+REM Generate version resource (unsigned exe reputation hint)
+echo Generating version resource...
+%PYTHON_CMD% build_version_info.py buildersion_info.txt
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] version resource generation failed.
+    exit /b 1
+)
+
 REM 빌드 실행
 echo PyInstaller 빌드 중...
-%PYTHON_CMD% -m PyInstaller --onefile --windowed --name koukai2_editor --icon assets\icon.ico --add-data "assets\icon.ico;assets" --noconfirm --clean koukai2_editor.py
+%PYTHON_CMD% -m PyInstaller --onefile --windowed --name koukai2_editor --icon assets\icon.ico --add-data "assets\icon.ico;assets" --version-file buildersion_info.txt --noconfirm --clean koukai2_editor.py
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] 빌드 실패.
     exit /b 1

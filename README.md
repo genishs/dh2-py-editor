@@ -15,12 +15,39 @@ GUI 도구.
 ## 빠른 시작 (배포판 사용)
 
 1. [Releases](https://github.com/genishs/dh2-py-editor/releases) 에서 최신
-   `koukai2_editor.exe` 를 받는다.
+   **`koukai2_editor-windows.zip`** 을 받아 압축을 푼다.
+   (`koukai2_editor.exe` 를 직접 받아도 되지만, 브라우저가 경고를 띄울 수 있다 —
+   아래 [다운로드가 막힐 때](#다운로드가-막힐-때) 참조.)
 2. `KOUKAI2.DAT` 가 있는 게임 폴더에 `koukai2_editor.exe` 를 복사한다.
 3. 더블클릭 또는 `cmd` / PowerShell 에서 실행 → GUI 창이 뜬다.
 
 > **백업 권장** — 편집 전 `KOUKAI2.DAT` 와 `MAIN.EXE` 를 백업하세요.
 > `MAIN.EXE.bak` 가 동봉되어 있으면 그것이 원본이므로 보존하세요.
+
+### 다운로드가 막힐 때
+
+Chrome 이 **"일반적으로 다운로드되지 않는 파일입니다 / 위험할 수 있습니다"** 라고
+막거나, 실행할 때 파란 SmartScreen 창이 뜨는 경우가 있다.
+
+**바이러스가 발견된 것이 아니다.** 이 프로그램에는 **코드 서명 인증서가 없다**
+(개인 취미 프로젝트라 유료 인증서를 쓰지 않는다). Chrome 과 SmartScreen 은
+"서명자 평판 + 파일 평판" 으로 위험도를 판단하는데, 서명이 없으면 평판이 릴리스
+마다 0 에서 다시 시작하기 때문에 나오는 경고다.
+
+받는 방법:
+
+| 상황 | 대처 |
+|---|---|
+| 다운로드 자체가 막힘 | Releases 의 **`.zip`** 을 받는다. 보통 경고 없이 받아진다. |
+| `.exe` 를 받다 경고가 뜸 | Chrome 다운로드 목록에서 해당 항목의 **⋮ → 계속** (또는 "무시하고 계속") |
+| 실행 시 SmartScreen 파란 창 | **추가 정보 → 실행** |
+| 그래도 못 믿겠음 | Release 의 `SHA256SUMS.txt` 와 대조하거나, 아래 [빌드](#빌드) 로 직접 만든다. |
+
+체크섬 확인 (PowerShell):
+
+```powershell
+Get-FileHash .\koukai2_editor.exe -Algorithm SHA256
+```
 
 ### ⚠️ 알려진 주의사항
 

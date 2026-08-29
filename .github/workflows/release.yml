@@ -37,9 +37,14 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --upgrade pyinstaller
 
+      # 서명 없는 exe 의 평판 휴리스틱을 조금이라도 덜 불리하게 만들기 위해
+      # 버전 리소스(회사/제품/버전) 를 심는다. 상세는 README "다운로드가 막힐 때".
+      - name: Generate version resource
+        run: python build_version_info.py build/version_info.txt
+
       - name: Build single-file executable
         run: |
-          python -m PyInstaller --onefile --windowed --name koukai2_editor --icon assets/icon.ico --add-data "assets/icon.ico;assets" --noconfirm --clean koukai2_editor.py
+          python -m PyInstaller --onefile --windowed --name koukai2_editor --icon assets/icon.ico --add-data "assets/icon.ico;assets" --version-file build/version_info.txt --noconfirm --clean koukai2_editor.py
 
       - name: Verify build artifact
         shell: pwsh
@@ -48,13 +53,32 @@ jobs:
             Write-Error "Build artifact not found"
             exit 1
           }
+          $info = (Get-Item "dist/koukai2_editor.exe").VersionInfo
+          if (-not $info.ProductName) {
+            Write-Error "버전 리소스가 비어 있습니다 (--version-file 누락?)"
+            exit 1
+          }
           Get-Item "dist/koukai2_editor.exe" | Format-List Name, Length, LastWriteTime
+          $info | Format-List CompanyName, ProductName, FileVersion
+
+      # Chrome Safe Browsing 은 서명 없는 .exe 직접 다운로드에 경고를 띄운다.
+      # .zip 으로도 함께 제공해 경고 없이 받을 수 있는 경로를 남긴다.
+      - name: Package zip + checksums
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          Copy-Item dist/koukai2_editor.exe release/
+          Compress-Archive -Path dist/koukai2_editor.exe -DestinationPath release/koukai2_editor-windows.zip -Force
+          Get-ChildItem release -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
+          } | Set-Content -Path release/SHA256SUMS.txt -Encoding ascii
+          Get-Content release/SHA256SUMS.txt
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: koukai2_editor-windows
-          path: dist/koukai2_editor.exe
+          path: release/*
           if-no-files-found: error
 
   release:
@@ -70,7 +94,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: koukai2_editor-windows
-          path: dist
+          path: release
 
       - name: Determine release tag
         id: tag
@@ -88,10 +112,28 @@ jobs:
           tag_name: ${{ steps.tag.outputs.name }}
           name: ${{ steps.tag.outputs.name }}
           prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
-          files: dist/koukai2_editor.exe
+          files: |
+            release/koukai2_editor-windows.zip
+            release/koukai2_editor.exe
+            release/SHA256SUMS.txt
           generate_release_notes: true
           body: |
             대항해시대 II 세이브 에디터 (Python 재구현) ${{ steps.tag.outputs.name }}
+
+            ## 내려받기
+            - **`koukai2_editor-windows.zip`** ← 이걸 받으세요. 압축을 풀면 `koukai2_editor.exe` 가 나옵니다.
+            - `koukai2_editor.exe` — 단일 파일. 브라우저가 경고를 띄울 수 있습니다 (아래 참고).
+            - `SHA256SUMS.txt` — 무결성 확인용 체크섬.
+
+            ## 브라우저가 다운로드를 막는다면
+            이 프로그램은 **코드 서명 인증서가 없습니다** (개인 취미 프로젝트라 유료 인증서를 쓰지 않습니다).
+            그래서 Chrome 은 "일반적으로 다운로드되지 않는 파일" 이라는 경고를 띄웁니다. 바이러스가
+            발견된 것이 아니라, **서명이 없어 평판 데이터가 없다** 는 뜻입니다.
+
+            - **가장 쉬운 방법**: 위의 `.zip` 을 받으세요. 보통 경고 없이 받아집니다.
+            - `.exe` 를 직접 받다 막혔다면: Chrome 다운로드 항목의 **⋮ → 계속** (또는 "무시하고 계속").
+            - 실행할 때 파란 SmartScreen 창이 뜨면 **추가 정보 → 실행**.
+            - 걱정되면 `SHA256SUMS.txt` 의 해시와 대조하거나, 소스를 직접 빌드하세요 (`build.bat`).
 
             ## 사용법
             1. `koukai2_editor.exe` 를 게임 폴더 (KOUKAI2.DAT 가 있는 곳) 에 복사
