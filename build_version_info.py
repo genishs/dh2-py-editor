@@ -63,7 +63,21 @@ def read_version() -> str:
     return m.group(1)
 
 
+def _force_utf8_output() -> None:
+    """stdout/stderr 를 UTF-8 로. 러너 기본 인코딩(cp1252) 에서 한글 출력이
+    UnicodeEncodeError 를 내는 것을 막는다."""
+    for name in ("stdout", "stderr"):
+        stream = getattr(sys, name, None)
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
+
 def main(argv: list[str]) -> int:
+    _force_utf8_output()
     version = read_version()
     parts = [int(p) for p in re.findall(r"\d+", version)[:3]]
     while len(parts) < 3:
@@ -85,7 +99,7 @@ def main(argv: list[str]) -> int:
         ),
         encoding="utf-8",
     )
-    print(f"version_info 생성: {out}  (버전 {version})")
+    print(f"version_info written: {out} (version {version})")
     return 0
 
 
