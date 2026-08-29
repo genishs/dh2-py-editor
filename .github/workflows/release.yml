@@ -61,8 +61,56 @@ jobs:
           Get-Item "dist/koukai2_editor.exe" | Format-List Name, Length, LastWriteTime
           $info | Format-List CompanyName, ProductName, FileVersion
 
+      # --- 코드 서명 (SignPath Foundation) -------------------------------
+      # 저장소 변수 SIGNPATH_ORGANIZATION_ID / SIGNPATH_PROJECT_SLUG /
+      # SIGNPATH_SIGNING_POLICY_SLUG 와 시크릿 SIGNPATH_API_TOKEN 이 설정된
+      # 뒤에만 동작한다. 미설정 상태에서는 통째로 건너뛰고 서명 없는 빌드가
+      # 그대로 릴리스된다 (기존 동작).
+      #
+      # 주의: SignPath Foundation 은 릴리스마다 Approver 의 수동 승인을
+      # 요구한다. wait-for-completion: true 이므로 승인 전까지 이 잡이
+      # 대기한다. 승인을 놓치면 job timeout 으로 실패한다.
+      - name: Upload unsigned artifact for signing
+        id: upload-unsigned
+        if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: koukai2_editor-unsigned
+          path: dist/koukai2_editor.exe
+          if-no-files-found: error
+
+      - name: Submit signing request to SignPath
+        id: signpath
+        if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
+      - name: Replace exe with signed build
+        if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "signed/koukai2_editor.exe")) {
+            Write-Error "서명된 산출물이 없습니다."
+            exit 1
+          }
+          $sig = Get-AuthenticodeSignature "signed/koukai2_editor.exe"
+          if ($sig.Status -ne 'Valid') {
+            Write-Error "서명 검증 실패: $($sig.Status) — $($sig.StatusMessage)"
+            exit 1
+          }
+          Write-Host "서명자: $($sig.SignerCertificate.Subject)"
+          Copy-Item signed/koukai2_editor.exe dist/koukai2_editor.exe -Force
+
       # Chrome Safe Browsing 은 서명 없는 .exe 직접 다운로드에 경고를 띄운다.
       # .zip 으로도 함께 제공해 경고 없이 받을 수 있는 경로를 남긴다.
+      # (서명이 붙으면 이 경고 자체가 거의 사라지지만, zip 은 그대로 유지한다.)
       - name: Package zip + checksums
         shell: pwsh
         run: |

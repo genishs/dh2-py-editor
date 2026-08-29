@@ -291,7 +291,22 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 
 ## 버전 히스토리
 
-### v0.4.17 (2026-05-31 — 충성도 동료-only 표시 + 인물 탭 레이아웃 정리)
+### v0.4.17 (2026-08-29 — 충성도 동료-only 표시 + 브라우저 다운로드 차단 완화)
+
+- **브라우저가 다운로드를 막는 문제 완화** — Chrome 이 릴리스 `.exe` 를
+    "일반적으로 다운로드되지 않는 파일" 로 경고해 받지 못한다는 제보. 원인은
+    바이러스 오탐이 아니라 **코드 서명 부재 + 버전 리소스 공란** 이었다
+    (Windows Defender 스캔은 통과, `Get-AuthenticodeSignature` → `NotSigned`,
+    CompanyName/ProductName/FileVersion 모두 빈 값).
+    - `build_version_info.py` 신규 — `__version__` 에서 버전 리소스를 생성해
+      `--version-file` 로 `.exe` 에 임베드. 이제 파일 속성에 제품명·버전·
+      저작권이 표시된다.
+    - Release 에 **`koukai2_editor-windows.zip`** 과 `SHA256SUMS.txt` 를 함께
+      게시. `.zip` 은 보통 경고 없이 받아진다.
+    - README 에 [다운로드가 막힐 때](#다운로드가-막힐-때) 절 추가.
+    - 근본 해결인 코드 서명을 위해 [SignPath Foundation](https://signpath.org/)
+      무료 OSS 프로그램 신청 준비 — [`CODE_SIGNING_POLICY.md`](CODE_SIGNING_POLICY.md)
+      작성, 릴리스 워크플로에 서명 단계를 저장소 변수로 켜지는 형태로 배선.
 
 - **충성도는 주인공 동료일 때만 표시** — 충성도(`none1`)는 주인공 동료에게만
     의미가 있으므로, 인물의 소속이 동료(`pos` = 주인공 카탈로그 ID)인 경우에만
