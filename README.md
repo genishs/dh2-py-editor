@@ -49,6 +49,17 @@ Chrome 이 **"일반적으로 다운로드되지 않는 파일입니다 / 위험
 Get-FileHash .\koukai2_editor.exe -Algorithm SHA256
 ```
 
+#### 코드 서명 상태
+
+현재 배포되는 `.exe` 에는 코드 서명이 없다. 근본 해결을 위해
+[SignPath Foundation](https://signpath.org/) 의 오픈소스 무료 코드 서명 프로그램에
+**신청 중**이며, 승인되면 릴리스 바이너리는 SignPath Foundation 이 발급한
+인증서로 서명된다. 서명 인프라는 [SignPath.io](https://signpath.io/) 가 무료로
+제공한다.
+
+역할 구분·빌드/서명 절차·개인정보 처리는 [`CODE_SIGNING_POLICY.md`](CODE_SIGNING_POLICY.md)
+에 문서화되어 있다.
+
 ### ⚠️ 알려진 주의사항
 
 - **리스본 (항구 #0) 의 상업치 편집은 권장하지 않습니다.** 항구 경제 테이블의
