@@ -14,15 +14,45 @@ GUI 도구.
 
 ## 빠른 시작 (배포판 사용)
 
+> 💡 **이 프로그램은 게임 폴더에 설치할 필요가 없습니다.**
+> 아무 곳에나 두고 실행한 뒤, 게임 폴더 안의 저장 파일(`KOUKAI2.DAT`)만
+> 선택하면 됩니다.
+
+### 설치 방법 A — 명령 한 줄로 설치 (권장)
+
+브라우저의 다운로드 경고를 아예 만나지 않는 방법입니다.
+
+1. 키보드에서 **윈도우 키**를 누르고 `터미널` 을 입력해
+   **터미널**(또는 PowerShell)을 엽니다.
+2. 아래 한 줄을 붙여넣고 Enter:
+
+   ```
+   winget install genishs.Koukai2Editor
+   ```
+
+3. 설치가 끝나면, 터미널에 `koukai2-editor` 를 입력해 언제든 실행할 수
+   있습니다. (업데이트는 `winget upgrade genishs.Koukai2Editor`)
+
+### 설치 방법 B — 직접 다운로드
+
 1. [Releases](https://github.com/genishs/dh2-py-editor/releases) 에서 최신
-   **`koukai2_editor-windows.zip`** 을 받아 압축을 푼다.
+   **`koukai2_editor-windows.zip`** 을 받아 **아무 폴더에나** 압축을 푼다.
    (`koukai2_editor.exe` 를 직접 받아도 되지만, 브라우저가 경고를 띄울 수 있다 —
    아래 [다운로드가 막힐 때](#다운로드가-막힐-때) 참조.)
-2. `KOUKAI2.DAT` 가 있는 게임 폴더에 `koukai2_editor.exe` 를 복사한다.
-3. 더블클릭 또는 `cmd` / PowerShell 에서 실행 → GUI 창이 뜬다.
+2. `koukai2_editor.exe` 를 더블클릭 → GUI 창이 뜬다.
+
+### 처음 실행했을 때
+
+1. 저장 파일을 고르는 창이 뜨면, **게임이 설치된 폴더**에서 `KOUKAI2.DAT`
+   를 찾아 선택한다. (게임에서 한 번이라도 저장해야 편집할 내용이 생긴다.)
+2. 편집할 저장 칸(슬롯)을 고른다.
+3. 원하는 탭에서 값을 바꾸고 저장한다. 게임을 다시 실행하면 적용되어 있다.
+
+같은 내용이 프로그램 안 **[도움말] ▸ [처음 사용 안내]** 에도 있습니다.
 
 > **백업 권장** — 편집 전 `KOUKAI2.DAT` 와 `MAIN.EXE` 를 백업하세요.
 > `MAIN.EXE.bak` 가 동봉되어 있으면 그것이 원본이므로 보존하세요.
+> 게임(DOSBox 등)은 완전히 종료한 뒤 편집하세요.
 
 ### 다운로드가 막힐 때
 
@@ -51,11 +81,12 @@ Get-FileHash .\koukai2_editor.exe -Algorithm SHA256
 
 #### 코드 서명 상태
 
-현재 배포되는 `.exe` 에는 코드 서명이 없다. 근본 해결을 위해
-[SignPath Foundation](https://signpath.org/) 의 오픈소스 무료 코드 서명 프로그램에
-**신청 중**이며, 승인되면 릴리스 바이너리는 SignPath Foundation 이 발급한
-인증서로 서명된다. 서명 인프라는 [SignPath.io](https://signpath.io/) 가 무료로
-제공한다.
+현재 배포되는 `.exe` 에는 코드 서명이 없다.
+[SignPath Foundation](https://signpath.org/) 의 오픈소스 무료 코드 서명
+프로그램에 신청했으나 **프로젝트 인지도(스타·외부 언급 등) 요건 미달로
+보류**되었다 (품질 문제가 아니라 가시성 요건이며, 인지도가 쌓이면 재신청
+예정). 그때까지는 다운로드 경고를 원천 우회하는
+**[설치 방법 A (winget)](#설치-방법-a--명령-한-줄로-설치-권장)** 사용을 권한다.
 
 역할 구분·빌드/서명 절차·개인정보 처리는 [`CODE_SIGNING_POLICY.md`](CODE_SIGNING_POLICY.md)
 에 문서화되어 있다.
@@ -301,6 +332,19 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 ---
 
 ## 버전 히스토리
+
+### v0.4.19 (2026-09-05 — winget 설치 지원 + 처음 사용 안내 ([#13](https://github.com/genishs/dh2-py-editor/issues/13)))
+
+- **winget(Windows 패키지 관리자) 등록** — `winget install genishs.Koukai2Editor`
+    한 줄로 설치. winget 설치는 브라우저 다운로드를 거치지 않으므로 Chrome
+    Safe Browsing 차단이 아예 발생하지 않는다. README 빠른 시작을 설치 방법
+    A(winget)/B(직접 다운로드) 2원화하고, "게임 폴더에 복사" 안내(불필요한
+    단계였음)를 제거 — 프로그램은 어디에 있든 실행 후 세이브 파일만 선택하면
+    된다.
+- **[도움말] ▸ [처음 사용 안내] 신설** — 설치(두 방법)·첫 실행·백업·주의
+    사항을 초보 사용자 눈높이로 안내하는 다이얼로그. "실행과 사용이 어렵다"는
+    피드백 반영.
+- 코드 서명 상태 절 현행화 (SignPath Foundation 보류 — 가시성 요건, 재신청 예정).
 
 ### v0.4.18 (2026-09-05 — 이름 입력 끝 글자가 �로 깨지는 버그 수정)
 
