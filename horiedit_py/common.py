@@ -136,14 +136,22 @@ def decode_kr(buf: bytes) -> str:
 
 
 def encode_kr_fixed(s: str, size: int) -> bytes:
-    """문자열을 EUC-KR 로 인코딩하여 size 바이트 고정 버퍼에 채움. 남는 부분은 NUL."""
+    """문자열을 EUC-KR 로 인코딩하여 size 바이트 고정 버퍼에 채움. 남는 부분은 NUL.
+
+    절단은 문자 단위로 한다 — 바이트 단위로 자르면 2바이트 EUC-KR 문자
+    한가운데가 잘려 깨진 문자(�)가 저장된다 (#12).
+    """
     raw = s.encode("euc-kr", errors="replace")
     if len(raw) >= size:
-        # NUL 종료 보장: 마지막 1바이트는 0
-        raw = raw[: size - 1] + b"\x00"
-    else:
-        raw = raw + b"\x00" * (size - len(raw))
-    return raw
+        # NUL 종료 1바이트를 제외한 공간에 완전한 문자만 채움
+        out = bytearray()
+        for ch in s:
+            b = ch.encode("euc-kr", errors="replace")
+            if len(out) + len(b) > size - 1:
+                break
+            out += b
+        raw = bytes(out)
+    return raw + b"\x00" * (size - len(raw))
 
 
 # ---------------------------------------------------------------------------
