@@ -23,6 +23,7 @@ from horiedit_py.gui.help_dialog import (
     show_about,
     show_experimental_warning,
     show_features_dialog,
+    show_getting_started,
     show_whats_new,
 )
 from horiedit_py.gui.hero_tab import HeroTab
@@ -137,6 +138,10 @@ class EditorApp:
 
         # 도움말
         help_menu = tk.Menu(menubar, tearoff=False)
+        help_menu.add_command(
+            label="처음 사용 안내 (설치·실행·첫 편집)...",
+            command=lambda: show_getting_started(self._root),
+        )
         help_menu.add_command(
             label="새 기능 소개...",
             command=self._open_whats_new,
