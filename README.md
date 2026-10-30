@@ -338,14 +338,14 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 
 ## 버전 히스토리
 
-### v0.4.19 (2026-09-05 — winget 설치 지원 + 처음 사용 안내 ([#13](https://github.com/genishs/dh2-py-editor/issues/13)))
+### v0.4.19 (2026-10-30 — winget 설치 지원 준비 + 처음 사용 안내 ([#13](https://github.com/genishs/dh2-py-editor/issues/13)))
 
-- **winget(Windows 패키지 관리자) 등록** — `winget install genishs.Koukai2Editor`
-    한 줄로 설치. winget 설치는 브라우저 다운로드를 거치지 않으므로 Chrome
-    Safe Browsing 차단이 아예 발생하지 않는다. README 빠른 시작을 설치 방법
-    A(winget)/B(직접 다운로드) 2원화하고, "게임 폴더에 복사" 안내(불필요한
-    단계였음)를 제거 — 프로그램은 어디에 있든 실행 후 세이브 파일만 선택하면
-    된다.
+- **winget(Windows 패키지 관리자) 등록 제출 — 심사 중** — 등록이 끝나면
+    `winget install genishs.Koukai2Editor` 한 줄로 설치할 수 있다. winget 설치는
+    브라우저 다운로드를 거치지 않으므로 Chrome Safe Browsing 차단이 아예
+    발생하지 않는다. README 빠른 시작을 설치 방법 A(winget)/B(직접 다운로드)로
+    2원화하고, "게임 폴더에 복사" 안내(불필요한 단계였음)를 제거 — 프로그램은
+    어디에 있든 실행 후 세이브 파일만 선택하면 된다.
 - **[도움말] ▸ [처음 사용 안내] 신설** — 설치(두 방법)·첫 실행·백업·주의
     사항을 초보 사용자 눈높이로 안내하는 다이얼로그. "실행과 사용이 어렵다"는
     피드백 반영.
