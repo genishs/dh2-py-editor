@@ -20,11 +20,6 @@ GUI 도구.
 
 ### 설치 방법 A — 명령 한 줄로 설치 (권장)
 
-> ⏳ **현재 winget 등록 심사 중입니다.** 등록이 끝나기 전에는 아래 명령이
-> "패키지를 찾을 수 없다"는 메시지와 함께 실패합니다. 그동안은
-> **[설치 방법 B](#설치-방법-b--직접-다운로드)** 를 이용해 주세요.
-> 등록 진행 상황은 [#13](https://github.com/genishs/dh2-py-editor/issues/13) 에서 확인할 수 있습니다.
-
 브라우저의 다운로드 경고를 아예 만나지 않는 방법입니다.
 
 1. 키보드에서 **윈도우 키**를 누르고 `터미널` 을 입력해
@@ -340,7 +335,7 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 
 ### v0.4.19 (2026-10-30 — winget 설치 지원 준비 + 처음 사용 안내 ([#13](https://github.com/genishs/dh2-py-editor/issues/13)))
 
-- **winget(Windows 패키지 관리자) 등록 제출 — 심사 중** — 등록이 끝나면
+- **winget(Windows 패키지 관리자) 등록** (2026-11-03 등록 완료) —
     `winget install genishs.Koukai2Editor` 한 줄로 설치할 수 있다. winget 설치는
     브라우저 다운로드를 거치지 않으므로 Chrome Safe Browsing 차단이 아예
     발생하지 않는다. README 빠른 시작을 설치 방법 A(winget)/B(직접 다운로드)로
