@@ -10,6 +10,27 @@ GUI 도구.
 - Repository: https://github.com/genishs/dh2-py-editor
 - Releases: https://github.com/genishs/dh2-py-editor/releases
 
+## 바로 시작하기
+
+**① 설치** — 윈도우 키 → `터미널` 을 열고 아래 한 줄을 입력합니다. (처음 한 번만)
+
+```
+winget install genishs.Koukai2Editor
+```
+
+**② 실행** — 터미널을 **닫았다가 새로 연 뒤**, 게임 폴더로 이동해서 실행합니다.
+
+```
+cd "D:\Saved Games\dos\game\koukai2"
+koukai2-editor
+```
+
+- 첫 줄의 경로는 본인의 게임 폴더(`KOUKAI2.DAT` 가 있는 폴더)로 바꾸세요.
+  경로에 띄어쓰기가 있으면 꼭 큰따옴표(`" "`)로 감싸야 합니다.
+- 게임 폴더에서 실행하면 저장 파일을 자동으로 열어 바로 편집 화면이 뜹니다.
+- 편집 전에 `KOUKAI2.DAT`·`MAIN.EXE` 를 백업하고, 게임은 끈 상태에서 편집하세요.
+- 직접 내려받는 방법·자세한 안내는 아래 [빠른 시작](#빠른-시작-배포판-사용)을 보세요.
+
 ---
 
 ## 빠른 시작 (배포판 사용)
