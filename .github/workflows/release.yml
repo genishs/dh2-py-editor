@@ -202,3 +202,64 @@ jobs:
             편집 전 `KOUKAI2.DAT` 와 `MAIN.EXE` 를 백업하세요.
 
             상세는 [README.md](https://github.com/${{ github.repository }}/blob/master/README.md) 참조.
+
+  # --- winget 자동 제출 (microsoft/winget-pkgs) ---------------------------
+  # 릴리스가 만들어진 뒤 winget 커뮤니티 저장소에 새 버전 매니페스트 PR 을 올린다.
+  #
+  # 왜 별도 워크플로(on: release)가 아니라 같은 파일의 후속 job 인가:
+  #   GITHUB_TOKEN 으로 만든 릴리스는 다른 워크플로를 깨우지 않는다
+  #   (GitHub 문서: GITHUB_TOKEN 이벤트는 새 워크플로 실행을 만들지 않음).
+  #   그래서 release job 뒤에 needs: 로 잇는다.
+  #
+  # 시크릿 WINGET_TOKEN (classic PAT: public_repo + workflow) 이 없거나 비면
+  # 이 job 의 실제 단계는 전부 건너뛰고 notice 한 줄만 남긴다 — 실패가 아니다.
+  # (secrets 는 job-level `if` 에서 못 읽으므로 job-level env 로 불리언을 만들어
+  #  step-level `if` 로 거른다.)
+  #
+  # 전제: winget-pkgs 에 이 패키지의 버전이 이미 하나 이상 있어야 한다
+  #       (액션이 최신 버전 매니페스트를 바탕으로 새 버전을 만든다 — 설명·태그·ko-KR 로캘 등 승계).
+  winget:
+    name: Submit to winget-pkgs
+    needs: release
+    runs-on: ubuntu-latest
+    # prerelease 는 winget 에 올리지 않는다.
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.prerelease) }}
+    permissions:
+      contents: read
+    env:
+      HAS_WINGET_TOKEN: ${{ secrets.WINGET_TOKEN != '' }}
+    steps:
+      - name: Skip notice (WINGET_TOKEN not set)
+        if: ${{ env.HAS_WINGET_TOKEN != 'true' }}
+        shell: bash
+        run: |
+          echo "::notice title=winget 제출 건너뜀::시크릿 WINGET_TOKEN 이 없거나 비어 있어 winget-pkgs 제출을 건너뜁니다 (실패 아님)."
+
+      - name: Determine release tag and version
+        id: ver
+        if: ${{ env.HAS_WINGET_TOKEN == 'true' }}
+        shell: bash
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="$DISPATCH_VERSION"
+          else
+            tag="${{ github.ref_name }}"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "winget 제출 대상: tag=$tag version=${tag#v}"
+
+      # 액션은 v2 태그/main 이 같은 커밋을 가리키는 동안 그 SHA 로 고정한다
+      # (PAT 를 넘기는 액션이라 가변 ref 를 쓰지 않는다). 갱신은 수동 또는 dependabot.
+      - name: Publish to winget-pkgs
+        if: ${{ env.HAS_WINGET_TOKEN == 'true' }}
+        uses: vedantmgoyal9/winget-releaser@b7370d4d152efdce803a26cc6ca9eee58cb2ad54 # v2 (main 2026-10-07)
+        with:
+          identifier: genishs.Koukai2Editor
+          # 릴리스 에셋 중 koukai2_editor.exe 만 (zip·SHA256SUMS.txt 제외)
+          installers-regex: 'koukai2_editor\.exe$'
+          version: ${{ steps.ver.outputs.version }}
+          release-tag: ${{ steps.ver.outputs.tag }}
+          token: ${{ secrets.WINGET_TOKEN }}
