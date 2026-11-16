@@ -28,6 +28,7 @@ from horiedit_py.gui.help_dialog import (
 )
 from horiedit_py.gui.hero_tab import HeroTab
 from horiedit_py.gui.hull_cap_dialog import open_hull_cap_dialog
+from horiedit_py.gui import shortcut_ui
 from horiedit_py.gui.person_tab import PersonTab
 from horiedit_py.gui.port_tab import PortTab
 from horiedit_py.gui.settings_tab import SettingsTab
@@ -89,9 +90,13 @@ def _write_show_whats_new_on_startup(value: bool) -> None:
 class EditorApp:
     """메인 윈도우 + 탭 컨테이너."""
 
-    def __init__(self, root: tk.Tk, save_path: Path) -> None:
+    def __init__(
+        self, root: tk.Tk, save_path: Path, found_by_dialog: bool = False,
+    ) -> None:
         self._root = root
         self._save_path = save_path
+        # 파일 선택 창(또는 명령줄 인자)으로 고른 세이브인가 — 바로가기 질문 조건에 쓴다
+        self._found_by_dialog = found_by_dialog
         self._current_slot: Optional[int] = None
         self._tip_idx = 0
         self._tip_after_id: Optional[str] = None
@@ -155,6 +160,15 @@ class EditorApp:
             command=lambda: show_experimental_warning(self._root),
         )
         help_menu.add_separator()
+        help_menu.add_command(
+            label="바탕화면 바로가기 만들기",
+            command=lambda: shortcut_ui.create_manually(self._root, self._save_path),
+        )
+        help_menu.add_command(
+            label="바로가기 제거 (삭제 전에)...",
+            command=lambda: shortcut_ui.remove_manually(self._root),
+        )
+        help_menu.add_separator()
         help_menu.add_command(label="GitHub 이슈 보기", command=open_issues_page)
         help_menu.add_command(
             label="버전 정보...",
@@ -206,23 +220,36 @@ class EditorApp:
         if shown == 0:
             self._on_open_hull_cap()
 
-    def _open_whats_new(self) -> None:
+    def _open_whats_new(self, after_close=None) -> None:
         """새 기능 소개 창을 연다 (자동 시작 / 도움말 메뉴 공용).
 
         하단 체크박스 '프로그램 시작 시 새 기능 소개 창 열기' 의 현재 설정을
-        반영하고, 닫을 때 설정을 저장한다.
+        반영하고, 닫을 때 설정을 저장한다. after_close 가 있으면 창이 닫힌 뒤 호출.
         """
         cur = _read_show_whats_new_on_startup()
-        show_whats_new(
-            self._root,
-            show_on_startup=cur,
-            on_close=_write_show_whats_new_on_startup,
-        )
+
+        def _on_close(checked: bool) -> None:
+            _write_show_whats_new_on_startup(checked)
+            if after_close is not None:
+                self._root.after(50, after_close)
+
+        show_whats_new(self._root, show_on_startup=cur, on_close=_on_close)
 
     def _maybe_show_whats_new(self) -> None:
-        """시작 시 설정이 켜져 있으면 새 기능 소개 창을 표시."""
+        """시작 시 설정이 켜져 있으면 새 기능 소개 창을 표시.
+
+        그 창이 닫힌 뒤에(없으면 바로) 바탕화면 바로가기를 만들지 한 번 묻는다 —
+        두 창이 동시에 뜨지 않게 순서를 둔다.
+        """
         if _read_show_whats_new_on_startup():
-            self._open_whats_new()
+            self._open_whats_new(after_close=self._maybe_offer_shortcut)
+        else:
+            self._maybe_offer_shortcut()
+
+    def _maybe_offer_shortcut(self) -> None:
+        shortcut_ui.maybe_prompt_on_start(
+            self._root, self._save_path, self._found_by_dialog,
+        )
 
     # ---------------- 스타일 ----------------
 
@@ -496,8 +523,11 @@ class EditorApp:
                 pass
 
 
-def run(save_path: Path) -> int:
+def run(save_path: Path, found_by_dialog: bool = False) -> int:
     """KOUKAI2.DAT 를 열고 GUI mainloop 진입.
+
+    found_by_dialog: 파일 선택 창/명령줄 인자로 직접 고른 세이브인가
+    (False = 현재 폴더·exe 폴더에서 자동 탐지) — 바탕화면 바로가기 질문 조건.
 
     반환값: 종료 코드 (성공 0, 열기 실패 -1).
     """
@@ -520,7 +550,7 @@ def run(save_path: Path) -> int:
 
     root = tk.Tk()
     try:
-        EditorApp(root, save_path)
+        EditorApp(root, save_path, found_by_dialog)
         root.mainloop()
     finally:
         try:
