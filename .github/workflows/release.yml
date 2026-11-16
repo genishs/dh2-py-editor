@@ -32,6 +32,22 @@ jobs:
         with:
           python-version: '3.11'
 
+      # 빠른 실패: 정식 릴리스(태그 push, 또는 prerelease 가 아닌 수동 실행)인데 README 버전
+      # 히스토리에 이 버전 항목이 없으면, 몇 분짜리 빌드를 돌리기 전에 여기서 바로 멈춘다.
+      # (release job 의 「Build release notes」 가 같은 스크립트로 본문을 실제로 만든다.)
+      # Windows 러너 stdout 은 cp1252 라서 PYTHONUTF8 과 스크립트 내부 재설정으로 한글 출력을 보장한다.
+      - name: Check README release notes entry
+        shell: bash
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+          ALLOW_MISSING: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease }}
+          PYTHONUTF8: '1'
+        run: |
+          args=()
+          if [ "$ALLOW_MISSING" = "true" ]; then args+=(--allow-missing); fi
+          python scripts/release_notes.py --tag "$TAG" --out "$RUNNER_TEMP/release_changes_check.md" \
+            --no-compare-link "${args[@]}"
+
       - name: Install PyInstaller
         run: |
           python -m pip install --upgrade pip
@@ -137,6 +153,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # 직전 태그를 찾아 Full Changelog 링크를 만들기 위해 태그 전체 필요
 
       - name: Download Windows artifact
         uses: actions/download-artifact@v8
@@ -154,6 +172,62 @@ jobs:
             echo "name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Setup Python (release notes)
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      # 릴리스 본문 = README 버전 히스토리의 해당 버전 항목 (「변경 사항」) + 고정 안내.
+      # 이 본문은 winget 매니페스트의 ReleaseNotes 로도 그대로 들어간다 (winget-releaser 가
+      # 릴리스 본문을 가져감) — 그래서 짧게 유지하고 상세는 README 링크로 돌린다.
+      #
+      # 가드: 정식 릴리스(태그 push, 또는 prerelease 가 아닌 수동 실행)인데 README 에
+      #   `### vX.Y.Z` 항목이 없으면 이 단계가 실패해 릴리스가 만들어지지 않는다.
+      #   prerelease 수동 실행만 항목 없이 진행하고 안내 문구로 대체한다.
+      # generate_release_notes(커밋 자동 목록)는 껐다: README 항목과 중복되고, 커밋·PR 제목이
+      #   winget ReleaseNotes 에 잡음으로 실리기 때문. 대신 비교 링크(Full Changelog) 한 줄만 남긴다.
+      - name: Build release notes
+        shell: bash
+        env:
+          TAG: ${{ steps.tag.outputs.name }}
+          ALLOW_MISSING: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease }}
+          PYTHONUTF8: '1'
+        run: |
+          args=()
+          if [ "$ALLOW_MISSING" = "true" ]; then args+=(--allow-missing); fi
+          python scripts/release_notes.py --tag "$TAG" --repo "${{ github.repository }}" \
+            --out release_changes.md "${args[@]}"
+
+          cat > release_tail.md <<'EOF'
+          ## 설치
+          **winget (권장)** — 터미널에서 한 줄. 브라우저 다운로드를 거치지 않아 경고가 없습니다.
+          ```
+          winget install genishs.Koukai2Editor
+          ```
+          업데이트는 `winget upgrade genishs.Koukai2Editor`.
+
+          **직접 내려받기** — 아래 `koukai2_editor-windows.zip` 을 받아 아무 폴더에나 압축을 풀면 `koukai2_editor.exe` 가 나옵니다.
+          단일 `koukai2_editor.exe` 와 무결성 확인용 `SHA256SUMS.txt` 도 함께 올라와 있습니다.
+
+          ## 사용법
+          프로그램을 게임 폴더에 복사할 필요는 없습니다.
+          게임 폴더(`KOUKAI2.DAT` 가 있는 곳)에서 실행하면 저장 파일을 자동으로 열고, 다른 곳에서 실행하면 파일 선택 창이 뜹니다.
+          (winget 으로 설치했다면 터미널에서 `cd "게임 폴더"` 후 `koukai2-editor`.)
+          편집 전 `KOUKAI2.DAT` 와 `MAIN.EXE` 를 백업하고, 게임은 끈 상태에서 편집하세요.
+
+          ## 다운로드 경고·코드 서명
+          `.exe` 에는 코드 서명이 없어 Chrome·SmartScreen 이 경고할 수 있습니다. 바이러스가 아니라 서명 평판이 없다는 뜻이며,
+          winget 설치나 `.zip` 은 보통 경고 없이 받아집니다. 대처법은 [README](https://github.com/${{ github.repository }}/blob/master/README.md#다운로드가-막힐-때) 참조.
+
+          SignPath Foundation 무료 코드 서명은 신청했으나 프로젝트 가시성 요건 미달로 보류되었고, 재신청할 예정입니다
+          ([`CODE_SIGNING_POLICY.md`](https://github.com/${{ github.repository }}/blob/master/CODE_SIGNING_POLICY.md)).
+          모든 바이너리는 공개 저장소의 소스에서 GitHub Actions 로 자동 빌드됩니다.
+          EOF
+
+          cat release_changes.md release_tail.md > release_body.md
+          echo "----- release_body.md -----"
+          cat release_body.md
+
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
@@ -164,44 +238,8 @@ jobs:
             release/koukai2_editor-windows.zip
             release/koukai2_editor.exe
             release/SHA256SUMS.txt
-          generate_release_notes: true
-          body: |
-            대항해시대 II 세이브 에디터 (Python 재구현) ${{ steps.tag.outputs.name }}
-
-            ## 내려받기
-            - **`koukai2_editor-windows.zip`** ← 이걸 받으세요. 압축을 풀면 `koukai2_editor.exe` 가 나옵니다.
-            - `koukai2_editor.exe` — 단일 파일. 브라우저가 경고를 띄울 수 있습니다 (아래 참고).
-            - `SHA256SUMS.txt` — 무결성 확인용 체크섬.
-
-            ## 브라우저가 다운로드를 막는다면
-            이 프로그램은 **아직 코드 서명 인증서가 없습니다.**
-            그래서 Chrome 은 "일반적으로 다운로드되지 않는 파일" 이라는 경고를 띄웁니다. 바이러스가
-            발견된 것이 아니라, **서명이 없어 평판 데이터가 없다** 는 뜻입니다.
-
-            - **가장 쉬운 방법**: 위의 `.zip` 을 받으세요. 보통 경고 없이 받아집니다.
-            - `.exe` 를 직접 받다 막혔다면: Chrome 다운로드 항목의 **⋮ → 계속** (또는 "무시하고 계속").
-            - 실행할 때 파란 SmartScreen 창이 뜨면 **추가 정보 → 실행**.
-            - 걱정되면 `SHA256SUMS.txt` 의 해시와 대조하거나, 소스를 직접 빌드하세요 (`build.bat`).
-
-            ## 코드 서명 (Code signing)
-            이 프로젝트는 [SignPath Foundation](https://signpath.org/) 의 오픈소스 무료 코드 서명
-            프로그램에 **신청 중**입니다. 승인되면 릴리스 바이너리는 SignPath Foundation 이 발급한
-            인증서로 서명되며, 서명 인프라는 [SignPath.io](https://signpath.io/) 가 무료로 제공합니다.
-
-            - Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/) — *pending approval*.
-            - 역할 구분·빌드/서명 절차·개인정보 처리: [`CODE_SIGNING_POLICY.md`](https://github.com/${{ github.repository }}/blob/master/CODE_SIGNING_POLICY.md)
-
-            모든 배포 바이너리는 공개 저장소의 소스에서 GitHub Actions 로 자동 빌드됩니다.
-
-            ## 사용법
-            1. `koukai2_editor.exe` 를 게임 폴더 (KOUKAI2.DAT 가 있는 곳) 에 복사
-            2. 더블클릭 또는 cmd / PowerShell 에서 실행
-            3. 메뉴에 따라 슬롯을 선택하고 편집
-
-            ## 백업 권장
-            편집 전 `KOUKAI2.DAT` 와 `MAIN.EXE` 를 백업하세요.
-
-            상세는 [README.md](https://github.com/${{ github.repository }}/blob/master/README.md) 참조.
+          body_path: release_body.md
+          generate_release_notes: false
 
   # --- winget 자동 제출 (microsoft/winget-pkgs) ---------------------------
   # 릴리스가 만들어진 뒤 winget 커뮤니티 저장소에 새 버전 매니페스트 PR 을 올린다.
