@@ -36,6 +36,7 @@ from horiedit_py.data.port import (
     port_supply_is_standard,
     save_port_supply,
 )
+from horiedit_py.gui.canal_panel import CanalPanel
 
 
 _HEADER_HINT = (
@@ -81,6 +82,7 @@ class SettingsTab(ttk.Frame):
         self._ship4_panel: Optional[_Ship4Panel] = None
         self._ship5_panel: Optional[_Ship5Panel] = None
         self._supply_panel: Optional[_PortSupplyPanel] = None
+        self._canal_panel: Optional[CanalPanel] = None
         self._missing_label: Optional[ttk.Label] = None
 
         self._build_initial()
@@ -169,6 +171,7 @@ class SettingsTab(ttk.Frame):
         self._ship4_panel = None
         self._ship5_panel = None
         self._supply_panel = None
+        self._canal_panel = None
         self._missing_label = None
 
     def _rebuild_for_current_environment(self) -> None:
@@ -211,6 +214,11 @@ class SettingsTab(ttk.Frame):
         nb.add(self._supply_panel, text="항구 공급 수치 (효과 불확실)")
         self._supply_panel.add_dirty_listener(self._on_panel_dirty)
         self._supply_panel.set_enabled(self._slot_loaded)
+
+        # 운하 개통/원상복원 (시험 기능) — 게임 폴더의 지도 파일만 필요. 세이브 칸·MAIN.EXE 와 무관.
+        # 즉시 파일에 반영하는 방식이라 dirty/commit 대상이 아니다.
+        self._canal_panel = CanalPanel(nb, self._state)
+        nb.add(self._canal_panel, text="운하 (개통 / 원상복원)")
 
         self._on_panel_dirty()
 
