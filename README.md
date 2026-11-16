@@ -422,6 +422,25 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 
 ## 버전 히스토리
 
+### v0.4.25 (2026-11-16 — 운하 개통/원상복원 + 바탕화면 바로가기 ([#10](https://github.com/genishs/dh2-py-editor/issues/10), [#17](https://github.com/genishs/dh2-py-editor/issues/17)))
+
+- **운하 개통 / 원상복원 (시험 기능)** ([#10](https://github.com/genishs/dh2-py-editor/issues/10)) —
+    [게임 설정] 탭의 새 [운하] 구역에서 수에즈·파나마 운하를 **각각** 열고 닫는다.
+    게임(DOSBox)을 완전히 종료한 뒤 버튼을 누르고, 확인 창에서 내용을 보고 승인하면 된다.
+    게임 폴더의 지도 파일(`WORLDMAP.LZW`)에서 해당 운하 부분만 바꾸며, 첫 변경 때
+    원본을 `WORLDMAP.LZW.canal-orig` 로 백업한다 (이름을 되돌리면 완전한 원상복구).
+    - 한계: 다른 패치로 운하 부분이 이미 섞여 있으면 `알 수 없음` 으로 표시하고 바꾸지 않는다.
+        항구의 **[자동 이동] 항로는 운하를 쓰지 않는다** (운하 근처에서 직접 조종해 지나가야 한다).
+        게임 안 동작은 아직 실측 확인 전이라 시험 기능으로 둔다.
+- **바탕화면 바로가기 만들기** ([#17](https://github.com/genishs/dh2-py-editor/issues/17)) —
+    저장 파일을 열면 「바탕화면에 바로가기를 만들까요?」 라고 묻는다. 만들어 두면 다음부터
+    터미널 없이 아이콘만 더블클릭해도 그 세이브로 바로 열린다. 「다시 묻지 않기」를 고를 수 있고,
+    나중에 [도움말] ▸ [바탕화면 바로가기 만들기] 로도 만들 수 있다.
+- **바로가기 제거** — winget 으로 삭제할 때는 바탕화면 아이콘까지 지워 주지 못하므로,
+    **먼저** `koukai2-editor --remove-shortcuts` 로 바로가기를 지운 뒤
+    `winget uninstall genishs.Koukai2Editor` 를 실행한다 (순서 중요). 이 프로그램을 가리키는
+    바로가기만 지우며, [도움말] ▸ [바로가기 제거] 로도 할 수 있다.
+
 ### v0.4.20 (2026-11-16 — 릴리스 때 winget 자동 제출 + 릴리스 설명문 개편 ([#15](https://github.com/genishs/dh2-py-editor/issues/15)))
 
 - **릴리스하면 winget 에 새 버전이 자동으로 제출된다** ([#15](https://github.com/genishs/dh2-py-editor/issues/15),
