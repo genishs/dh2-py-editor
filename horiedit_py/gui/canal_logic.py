@@ -34,6 +34,18 @@ MSG_NO_WORLDMAP = (
 MSG_NO_GAME_DIR = "게임 폴더를 알 수 없어 지도 파일(WORLDMAP.LZW)을 찾지 못했습니다."
 
 
+#: 운하는 세이브가 아니라 게임 폴더의 지도 파일을 바꾼다 — 안내문(운하 탭·처음 사용 안내)에 쓴다.
+SCOPE_NOTE = (
+    "운하는 게임 폴더 단위로 적용됩니다. 세이브와 무관하게 그 게임 폴더의 모든 세이브와 새 게임에 똑같이 적용됩니다."
+)
+
+#: 원상복원(닫기) 확인 창에만 넣는 경고 — 운하 안에서 저장한 세이브가 있으면 함대가 갇힐 수 있다.
+RESTORE_WARNING = (
+    "· 운하 안(또는 바로 근처 수로)에서 저장한 세이브가 있다면, 닫은 뒤 그 세이브를 불러오면 "
+    "함대가 육지 위에 놓여 갇힐 수 있습니다. 운하를 완전히 빠져나온 곳에서 저장한 뒤 닫으세요."
+)
+
+
 def find_worldmap(game_dir: Union[str, os.PathLike, None]) -> Optional[Path]:
     """게임 폴더 바로 아래에서 WORLDMAP.LZW 를 대소문자 무시로 찾는다. 없으면 None.
 
@@ -107,9 +119,10 @@ def confirm_message(key: str, target_mode: str, path: Union[str, os.PathLike]) -
         backup_line,
         "· 항구에서 [자동 이동] 으로 가는 항로는 운하를 쓰지 않습니다.",
         "  운하 근처까지 가서 직접 조종해 지나가야 합니다.",
-        "",
-        "계속할까요?",
     ]
+    if target_mode != OPEN:
+        lines.append(RESTORE_WARNING)
+    lines += ["", "계속할까요?"]
     return "\n".join(lines)
 
 

@@ -106,6 +106,35 @@ class MessageTest(unittest.TestCase):
         self.assertIn("개통합니다", L.confirm_message("suez", canal.OPEN, self.p))
         self.assertIn("원래 상태(닫힘)", L.confirm_message("panama", canal.CLOSED, self.p))
 
+    def test_restore_confirm_warns_about_saves_inside_canal(self):
+        """원상복원(닫기) 확인 창에만 「운하 안에서 저장한 세이브 → 함대가 갇힘」 경고가 들어간다."""
+        for key in ("suez", "panama"):
+            closing = L.confirm_message(key, canal.CLOSED, self.p)
+            self.assertIn(L.RESTORE_WARNING, closing)
+            for frag in ("운하 안(또는 바로 근처 수로)에서 저장한 세이브", "함대가 육지 위에 놓여 갇힐 수 있습니다",
+                         "완전히 빠져나온 곳에서 저장한 뒤 닫으세요"):
+                self.assertIn(frag, closing)
+            opening = L.confirm_message(key, canal.OPEN, self.p)
+            self.assertNotIn("갇힐", opening)
+            self.assertNotIn(L.RESTORE_WARNING, opening)
+        # 경고는 마지막 질문 바로 앞에 와서 눈에 띈다
+        closing = L.confirm_message("suez", canal.CLOSED, self.p)
+        self.assertLess(closing.index(L.RESTORE_WARNING), closing.index("계속할까요?"))
+
+    def test_scope_note_is_per_game_folder(self):
+        """「게임 폴더 단위」 안내가 정의돼 있고 운하 탭 안내문·처음 사용 안내에 실려 있다."""
+        self.assertIn("게임 폴더 단위", L.SCOPE_NOTE)
+        self.assertIn("모든 세이브", L.SCOPE_NOTE)
+        self.assertIn("새 게임", L.SCOPE_NOTE)
+        import pathlib
+        root = pathlib.Path(__file__).resolve().parent.parent / "horiedit_py" / "gui"
+        panel_src = (root / "canal_panel.py").read_text(encoding="utf-8")
+        self.assertIn("logic.SCOPE_NOTE", panel_src)          # 탭 상단 안내문(_INTRO)에 포함
+        help_src = (root / "help_dialog.py").read_text(encoding="utf-8")
+        self.assertIn("게임 폴더 단위", help_src)            # 처음 사용 안내
+        readme = (root.parent.parent / "README.md").read_text(encoding="utf-8")
+        self.assertIn("게임 폴더 단위", readme)              # README 운하 절
+
     def test_confirm_mentions_existing_backup(self):
         self.assertIn("첫 변경", L.confirm_message("suez", canal.OPEN, self.p))
         L.backup_path(self.p).write_bytes(b"orig")
