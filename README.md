@@ -238,16 +238,33 @@ cargo 자동 재계산.
 분석이 완전치 않거나 가설 단계의 영역을 직접 편집. **게임이 정상 실행되지
 않을 수 있으므로 편집 전 KOUKAI2.DAT 와 MAIN.EXE 백업 필수.**
 
-내부 sub-Notebook 3개:
+내부 sub-Notebook 4개:
 
 | Sub-tab | 위치 | 검증 | 편집 항목 |
 |---|---|---|---|
 | **함선 정적 스펙 (Ship4 ROM)** | MAIN.EXE @ 0x0407DA | 확정 | lrudder/lsail/lcrew×10/dcrew/capacity/lnowea |
 | **함선 이름·외형 (Ship5 ROM)** | MAIN.EXE @ 0x040566 | 확정 | name(18B)/sform/bform 상위 4비트 |
 | **항구 공급 수치 (물가)** ([analysis_J](analysis/analysis_J_port_supply.md)) | slot `+0x5DE3 + idx*37 + 14` | 가설 | 10 byte/port — 표준 항구(0..99) ASCII digit/dot 인코딩 |
+| **운하 (개통 / 원상복원)** ([analysis_P](analysis/analysis_P_canal_worldmap.md), [#10](https://github.com/genishs/dh2-py-editor/issues/10)) | 게임 폴더의 `WORLDMAP.LZW` (대소문자 무시) | 시험 | 수에즈·파나마 운하를 각각 개통 / 원상복원 |
 
 read-modify-write 시 `none[*]` 패딩 byte 모두 보존. 항구 공급 수치 sub-tab 은
 slot 만 필요 (MAIN.EXE 없어도 사용 가능).
+
+#### 운하 (개통 / 원상복원) — 시험 기능
+
+수에즈·파나마 운하를 **각각** 열고 닫는다. 한 줄에 현재 상태(`개통됨` / `원상(닫힘)` /
+`알 수 없음`)와 버튼 하나(개통됨이면 `원상복원`, 닫힘이면 `개통`)가 있다.
+
+- **사용법**: 게임(DOSBox)을 **완전히 종료** → 버튼 → 확인 창에서 내용 확인 후 승인 → 게임 실행.
+- **무엇을 바꾸나**: 게임 폴더의 지도 파일 `WORLDMAP.LZW` 의 해당 운하 부분(수 바이트)만.
+  압축 형식(LS11)을 풀어 고친 뒤 원래 사전·압축 방식 그대로 다시 압축하고, 다시 풀어 대조해 맞을 때만 교체한다.
+- **백업**: 첫 변경 때 `WORLDMAP.LZW.canal-orig` 를 같은 폴더에 만든다(이미 있으면 덮어쓰지 않음).
+  이 파일 이름을 `WORLDMAP.LZW` 로 되돌리면 완전한 원상복구다.
+- **한계**
+  - 다른 패치(예: 카페 패치본의 일부만 적용 등)로 운하 부분이 섞여 있으면 `알 수 없음` 으로 표시하고 **바꾸지 않는다**.
+  - 항구에서 **[자동 이동] 항로는 운하를 쓰지 않는다**. 운하 근처까지 가서 직접 조종해 지나가야 한다.
+  - 게임을 켠 채로 바꾸면 반영되지 않거나 파일을 쓰지 못할 수 있다.
+  - 게임 안 동작은 아직 실측 확인 전이다(시험 기능).
 
 > 등장공업치(요구공업치) 와 최대 내구도(lhull) 는 함선 record (analysis_G)
 > 의 +0/+1 byte 임이 확정되어, [선박] 탭의 [원래 함선 정보] 에서 편집한다.
@@ -349,6 +366,7 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 이슈/PR/아이디어로 프로젝트에 기여해 주신 분들:
 
 - **jws** — 프로그램 아이콘 제공 ([#1](https://github.com/genishs/dh2-py-editor/issues/1))
+- **네이버 카페 「대항해시대」 글 작성자** — 수에즈·파나마 운하 패치 분석 글 ([daehangs/49651](https://cafe.naver.com/daehangs/49651)), 그림 출처 **수정가루** 님 ([daehangs/40602](https://cafe.naver.com/daehangs/40602)) ([#10](https://github.com/genishs/dh2-py-editor/issues/10))
 
 ---
 

@@ -195,7 +195,14 @@ def apply_canal_to_file(path: str, canal, mode: str, backup: bool = True) -> str
         if not os.path.exists(bak):
             shutil.copy2(path, bak)
     tmp = path + ".canal-tmp"
-    with open(tmp, "wb") as f:
-        f.write(blob)
-    os.replace(tmp, path)
+    try:
+        with open(tmp, "wb") as f:
+            f.write(blob)
+        os.replace(tmp, path)
+    except BaseException:
+        try:  # 실패해도 임시 파일을 남기지 않는다(원본은 그대로)
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
     return canal_state(new_parts, c)
