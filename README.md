@@ -354,6 +354,21 @@ MIT License — 자세한 사항은 [`LICENSE`](LICENSE) 참조.
 
 ## 버전 히스토리
 
+### v0.4.20 (2026-11-16 — 릴리스 때 winget 자동 제출 + 릴리스 설명문 개편 ([#15](https://github.com/genishs/dh2-py-editor/issues/15)))
+
+- **릴리스하면 winget 에 새 버전이 자동으로 제출된다** ([#15](https://github.com/genishs/dh2-py-editor/issues/15),
+    PR #16) — 릴리스 워크플로에 winget 제출 단계를 추가했다. 이제 새 버전이
+    나오면 `winget upgrade genishs.Koukai2Editor` 로 업데이트할 수 있다
+    (winget 저장소의 심사·머지가 끝난 뒤부터).
+- **GitHub 릴리스 설명문 개편** — 설치 안내를 winget 한 줄 우선(직접 내려받기는
+    그다음)으로 바꾸고, 「프로그램을 게임 폴더에 복사」 안내(불필요한 단계)를 지웠으며,
+    SignPath 를 「신청 중」으로 적던 것을 README 와 같게 「보류(가시성 요건), 재신청 예정」
+    으로 바로잡았다. 이 버전 히스토리 항목이 릴리스 설명문의 「변경 사항」으로 자동
+    삽입된다 (항목이 없으면 릴리스가 만들어지지 않는다).
+- **README 맨 위에 「바로 시작하기」 추가** — winget 설치 → 게임 폴더로 이동 → 실행,
+    세 단계를 첫 화면에서 따라 할 수 있다.
+- winget 등록 완료에 맞춰 설치 방법 A 의 「심사 중」 안내를 제거.
+
 ### v0.4.19 (2026-10-30 — winget 설치 지원 준비 + 처음 사용 안내 ([#13](https://github.com/genishs/dh2-py-editor/issues/13)))
 
 - **winget(Windows 패키지 관리자) 등록** (2026-11-03 등록 완료) —
