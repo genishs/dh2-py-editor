@@ -17,6 +17,7 @@ from tkinter import messagebox, ttk
 from typing import Callable, Optional
 
 from horiedit_py.common import EditorState, Person, decode_kr, encode_kr_fixed
+from horiedit_py.gui.layout import SplitPane, track_wraplength
 from horiedit_py.data.person import (
     HERO_CATALOG_ID,
     HERO_CATALOG_TO_IDX,
@@ -101,11 +102,11 @@ def _person_is_empty(p: Person) -> bool:
     return p.fname[:1] == b"\x00" and p.lname[:1] == b"\x00"
 
 
-class PersonTab(ttk.Frame):
+class PersonTab(SplitPane):
     """일반 인물 편집 탭."""
 
     def __init__(self, master: tk.Misc, state: EditorState) -> None:
-        super().__init__(master, padding=8)
+        super().__init__(master, grow="left", footer=False, padding=8)
         self._state = state
         self._slot_loaded = False
         self._person_idx: Optional[int] = None
@@ -147,42 +148,39 @@ class PersonTab(ttk.Frame):
     # ---------------- UI 구성 ----------------
 
     def _build(self) -> None:
-        # 결과 목록(왼쪽)이 남는 폭·높이를 가진다. 편집 폼(오른쪽)은 제 폭을 유지한다.
-        self.columnconfigure(0, weight=1)
-        self.columnconfigure(1, weight=0)
-        self.rowconfigure(0, weight=1)
-
+        # 왼쪽(검색칸 · 결과 목록 · [선택 → 우측에 로드])은 창 높이에 묶이고 결과 표만 안에서 스크롤한다.
+        # 오른쪽 편집 폼은 자체 ScrollFrame — 폼이 길어도 이 열만 스크롤되고 왼쪽 버튼은 늘 보인다. (SplitPane)
         self._build_left()
         self._build_right()
 
         self._hint = ttk.Label(
-            self,
+            self.right,
             text="(세이브 칸을 먼저 선택하세요)",
             foreground="#888",
         )
-        self._hint.grid(row=1, column=0, columnspan=2, pady=(8, 0))
+        self._hint.grid(row=1, column=0, pady=(8, 0))
 
     def _build_left(self) -> None:
-        left = ttk.Frame(self)
-        left.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        left = self.left
         left.rowconfigure(2, weight=1)
         left.columnconfigure(0, weight=1)
 
         # 검색 입력
         search = ttk.LabelFrame(left, text="검색", padding=8)
-        search.grid(row=0, column=0, sticky="w")  # 검색 칸은 제 폭 유지 (창이 커져도 입력칸만 길어지지 않게)
+        search.grid(row=0, column=0, sticky="ew")
+        search.columnconfigure(1, weight=1)
 
         ttk.Label(search, text="처음 이름").grid(row=0, column=0, sticky="w", padx=2, pady=2)
         self._ent_search_fname = ttk.Entry(
-            search, textvariable=self._var_search_fname, width=30
+            search, textvariable=self._var_search_fname
         )
-        self._ent_search_fname.grid(row=0, column=1, sticky="w", padx=2, pady=2)
+        self._ent_search_fname.grid(row=0, column=1, sticky="ew", padx=2, pady=2)
 
         ttk.Label(search, text="마지막 이름").grid(row=1, column=0, sticky="w", padx=2, pady=2)
         self._ent_search_lname = ttk.Entry(
-            search, textvariable=self._var_search_lname, width=30
+            search, textvariable=self._var_search_lname
         )
-        self._ent_search_lname.grid(row=1, column=1, sticky="w", padx=2, pady=2)
+        self._ent_search_lname.grid(row=1, column=1, sticky="ew", padx=2, pady=2)
 
         btns = ttk.Frame(search)
         btns.grid(row=2, column=0, columnspan=2, sticky="e", pady=(4, 0))
@@ -203,23 +201,26 @@ class PersonTab(ttk.Frame):
 
         cols = ("idx", "fname", "lname", "affiliation", "port")
         self._tv = ttk.Treeview(
-            tv_frame, columns=cols, show="headings", height=8, selectmode="browse"
+            tv_frame, columns=cols, show="headings", height=5, selectmode="browse"
         )
         self._tv.heading("idx", text="번호")
         self._tv.heading("fname", text="처음이름")
         self._tv.heading("lname", text="마지막이름")
         self._tv.heading("affiliation", text="소속")
         self._tv.heading("port", text="항구·위치")
-        self._tv.column("idx", width=50, anchor="center", stretch=False)
-        self._tv.column("fname", width=90, anchor="w")
-        self._tv.column("lname", width=90, anchor="w")
-        self._tv.column("affiliation", width=140, anchor="w")
-        self._tv.column("port", width=130, anchor="w")
+        self._tv.column("idx", width=50, minwidth=40, anchor="center", stretch=False)
+        self._tv.column("fname", width=90, minwidth=50, anchor="w")
+        self._tv.column("lname", width=90, minwidth=50, anchor="w")
+        self._tv.column("affiliation", width=140, minwidth=70, anchor="w")
+        self._tv.column("port", width=130, minwidth=60, anchor="w")
         self._tv.grid(row=0, column=0, sticky="nsew")
 
         sb = ttk.Scrollbar(tv_frame, orient="vertical", command=self._tv.yview)
         sb.grid(row=0, column=1, sticky="ns")
-        self._tv.configure(yscrollcommand=sb.set)
+        # 좁은 창에서 열이 잘리지 않게 가로 스크롤바 (넓으면 안 쓰인다)
+        sbx = ttk.Scrollbar(tv_frame, orient="horizontal", command=self._tv.xview)
+        sbx.grid(row=1, column=0, sticky="ew")
+        self._tv.configure(yscrollcommand=sb.set, xscrollcommand=sbx.set)
 
         self._tv.bind("<Double-1>", self._on_tv_double)
 
@@ -231,14 +232,16 @@ class PersonTab(ttk.Frame):
         self._btn_select.grid(row=0, column=0, padx=2)
 
     def _build_right(self) -> None:
-        right = ttk.Frame(self)
-        right.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+        right = ttk.Frame(self.right)
+        self.right.columnconfigure(0, weight=1)
+        right.grid(row=0, column=0, sticky="new", padx=(6, 0))
         right.columnconfigure(0, weight=1)
 
         self._lbl_current = ttk.Label(
             right, text="(선택된 인물 없음)", foreground="#444"
         )
-        self._lbl_current.grid(row=0, column=0, sticky="w", pady=(0, 6))
+        self._lbl_current.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+        track_wraplength(self._lbl_current)
 
         # 이름
         name_frame = ttk.LabelFrame(right, text="이름", padding=8)
@@ -323,7 +326,8 @@ class PersonTab(ttk.Frame):
         self._lbl_affiliation = ttk.Label(
             port_frame, text="(인물을 먼저 선택하세요)", foreground="#246"
         )
-        self._lbl_affiliation.grid(row=0, column=1, sticky="w", padx=2, pady=2)
+        self._lbl_affiliation.grid(row=0, column=1, sticky="ew", padx=2, pady=2)
+        track_wraplength(self._lbl_affiliation, min_wrap=120)
 
         # 소속 변경 Combobox (안전 옵션, analysis_K §9.2)
         ttk.Label(port_frame, text="소속 변경").grid(
@@ -336,7 +340,7 @@ class PersonTab(ttk.Frame):
             width=32,
             values=_POS_COMBO_LABELS,
         )
-        self._cb_pos.grid(row=1, column=1, sticky="ew", padx=2, pady=2)
+        self._cb_pos.grid(row=1, column=1, sticky="w", padx=2, pady=2)
         self._cb_pos.bind("<<ComboboxSelected>>", self._on_pos_combo_selected)
 
         # 소속 직접 입력 (고급)
@@ -347,12 +351,14 @@ class PersonTab(ttk.Frame):
             port_frame, from_=0, to=255, textvariable=self._var_pos, width=8
         )
         self._sp_pos.grid(row=2, column=1, sticky="w", padx=2, pady=2)
-        ttk.Label(
+        adv_hint = ttk.Label(
             port_frame,
             text="* 고급: 보통은 위 [소속 변경] 목록을 쓰세요. 1~6번 주인공은 변경 비권장.",
             foreground="#888",
             justify="left",
-        ).grid(row=3, column=0, columnspan=2, sticky="w", padx=2, pady=(0, 4))
+        )
+        adv_hint.grid(row=3, column=0, columnspan=2, sticky="ew", padx=2, pady=(0, 4))
+        track_wraplength(adv_hint)
 
         ttk.Label(port_frame, text="정착 항구").grid(row=4, column=0, sticky="w", padx=2, pady=2)
         self._cb_port = ttk.Combobox(
@@ -362,14 +368,15 @@ class PersonTab(ttk.Frame):
             width=22,
             values=[],
         )
-        self._cb_port.grid(row=4, column=1, sticky="ew", padx=2, pady=2)
+        self._cb_port.grid(row=4, column=1, sticky="w", padx=2, pady=2)
         self._cb_port.bind("<<ComboboxSelected>>", self._on_dirty_event)
         self._lbl_port_hint = ttk.Label(
             port_frame,
             text="(정착민이 아니므로 항구를 정할 수 없습니다)",
             foreground="#888",
         )
-        self._lbl_port_hint.grid(row=5, column=0, columnspan=2, sticky="w", padx=2)
+        self._lbl_port_hint.grid(row=5, column=0, columnspan=2, sticky="ew", padx=2)
+        track_wraplength(self._lbl_port_hint)
 
         # 충성도 (none1, +43) — 주인공 동료일 때만 표시 (그 외에는 의미 없음).
         self._lbl_loyalty = ttk.Label(port_frame, text="충성도")
@@ -385,8 +392,9 @@ class PersonTab(ttk.Frame):
             justify="left",
         )
         self._lbl_loyalty_hint.grid(
-            row=7, column=0, columnspan=2, sticky="w", padx=2, pady=(0, 4)
+            row=7, column=0, columnspan=2, sticky="ew", padx=2, pady=(0, 4)
         )
+        track_wraplength(self._lbl_loyalty_hint)
         # 충성도 행 위젯 묶음 (동료 여부에 따라 표시/숨김)
         self._loyalty_widgets = (
             self._lbl_loyalty, self._sp_loyalty, self._lbl_loyalty_hint,

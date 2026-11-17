@@ -10,9 +10,13 @@ tkinter/ttk 표준 라이브러리만 쓴다.
    · 안 들어가면 스크롤바가 필요한 방향에만 나타난다.
 2. 마우스 휠은 포인터 아래에 있는 스크롤 영역만 움직인다 (중첩돼도 가장 안쪽의 넘치는 영역).
    · Listbox/Treeview/Text 는 자기 휠 처리를 그대로 쓴다 (끝에 닿거나 넘치지 않으면 바깥 영역이 받는다).
-   · 콤보박스/스핀박스 위에서는, 바깥 영역이 스크롤 가능할 때 값이 바뀌지 않고 화면이 스크롤된다
-     (스크롤하다 값이 실수로 바뀌는 것 방지).
+   · 콤보박스/스핀박스 위에서는 값이 바뀌지 않는다 — 바깥 영역이 스크롤 가능하면 화면이 스크롤되고, 아니면 무시.
 3. 값을 넣는 폼은 창이 커져도 자기 폭을 유지한다 (늘어나는 건 목록·표·텍스트).
+4. 「목록 + 상세」 화면은 :class:`SplitPane` — 목록은 창 높이에 묶여 안에서 스크롤하고, 상세 폼은 자기 ScrollFrame 을
+   따로 가진다. 화면 전체가 한꺼번에 스크롤되지 않는다.
+5. 실행 버튼 줄(저장 / 적용 / 다시 불러오기 …)은 :class:`Page`/:class:`SplitPane` 의 ``footer`` — 스크롤 영역 밖 하단에
+   고정돼 있어 어떤 창 크기에서도 스크롤하지 않고 눌 수 있다.
+6. 마우스 휠은 콤보박스/스핀박스 값을 절대 바꾸지 않는다 (화살표·키보드로만) — 가장 가까운 스크롤 영역을 움직이거나 아무 일도 안 한다.
 """
 
 from __future__ import annotations
@@ -45,6 +49,8 @@ class ScrollFrame(ttk.Frame):
 
     - 안쪽 프레임(``body``) 폭 = 캔버스 폭 (내용 최소 폭보다 좁아지면 가로 스크롤바).
     - 안쪽 프레임 높이 = 캔버스 높이 (내용 최소 높이보다 낮아지면 세로 스크롤바).
+    - ``request_width`` 이면 안쪽 내용의 폭만큼(+세로 스크롤바 자리)을 요청 폭으로 삼는다 — grid 의 한 칸에 넣었을 때
+      그 칸이 내용 폭을 먼저 받고, 모자랄 때만 가로 스크롤이 생긴다.
     - ``max_body_width`` 를 주면 안쪽 폭의 상한 — 폼만 있는 화면이 2560px 로 늘어나지 않게 하고,
       남는 폭은 ``align`` (``"nw"`` 왼쪽 / ``"n"`` 가운데) 으로 둔다.
     """
@@ -55,12 +61,15 @@ class ScrollFrame(ttk.Frame):
         *,
         max_body_width: Optional[int] = None,
         align: str = "nw",
+        request_width: bool = False,
         **kw: object,
     ) -> None:
         super().__init__(master, **kw)
         self._max_w = max_body_width
+        self._req_width = request_width
         self._center = align in ("n", "center")
         self._last_req = (-1, -1)
+        self._bars = (False, False)
         self._last_layout: "tuple[int, int, bool, bool]" = (-1, -1, False, False)
 
         bg = ttk.Style(self).lookup("TFrame", "background") or self.winfo_toplevel().cget("background")
@@ -112,6 +121,12 @@ class ScrollFrame(ttk.Frame):
         except tk.TclError:
             pass
 
+    def _regrid_canvas(self) -> None:
+        try:
+            self._canvas.grid(row=0, column=0, sticky="nsew")
+        except tk.TclError:
+            pass
+
     def refresh(self) -> None:
         """내용이 바뀐 뒤 즉시 다시 배치하고 싶을 때 (안 불러도 0.25초 안에 스스로 알아챈다)."""
         self.update_idletasks()
@@ -120,12 +135,17 @@ class ScrollFrame(ttk.Frame):
     def _relayout(self, _e: object = None) -> None:
         try:
             ow, oh = self.winfo_width(), self.winfo_height()
-            if ow <= 1 or oh <= 1:
-                return
             rw, rh = self.body.winfo_reqwidth(), self.body.winfo_reqheight()
             self._last_req = (rw, rh)
             vb = self._vbar.winfo_reqwidth()
             hb = self._hbar.winfo_reqheight()
+            if self._req_width:
+                # 아직 배치 전(ow<=1)이어도 요청 폭부터 정해 둬야 grid 가 이 칸에 폭을 준다
+                want = rw + vb
+                if int(self._canvas.cget("width")) != want:
+                    self._canvas.configure(width=want)
+            if ow <= 1 or oh <= 1:
+                return
             need_v = rh > oh
             need_h = rw > ow - (vb if need_v else 0)
             if need_h and not need_v:
@@ -133,6 +153,7 @@ class ScrollFrame(ttk.Frame):
             cw = ow - (vb if need_v else 0)
             ch = oh - (hb if need_h else 0)
 
+            bars = (need_v, need_h)
             if need_v:
                 self._vbar.grid()
             else:
@@ -141,6 +162,11 @@ class ScrollFrame(ttk.Frame):
                 self._hbar.grid()
             else:
                 self._hbar.grid_remove()
+            if bars != self._bars:
+                self._bars = bars
+                # Configure 처리 도중 스크롤바를 빼면 grid 가 캔버스 크기를 다시 계산하지 않는 경우가 있다
+                # (창을 줄였다 키우면 캔버스가 옛 크기로 남음) — 캔버스를 다시 grid 해서 강제로 재배치한다.
+                self.after_idle(self._regrid_canvas)
 
             bw = max(cw, rw)
             if self._max_w is not None:
@@ -195,6 +221,65 @@ class ScrollFrame(ttk.Frame):
                 self._canvas.yview_moveto(min(total - view, bottom - view + 8) / total)
         except tk.TclError:
             pass
+
+
+def _make_footer(parent: tk.Misc, row: int, columnspan: int = 1) -> ttk.Frame:
+    """스크롤 영역 밖 하단 고정 버튼 줄 — 위에 구분선. 반환: 버튼들을 넣을 프레임."""
+    box = ttk.Frame(parent)
+    box.grid(row=row, column=0, columnspan=columnspan, sticky="ew")
+    ttk.Separator(box, orient="horizontal").pack(side="top", fill="x", pady=(4, 0))
+    bar = ttk.Frame(box)
+    bar.pack(side="top", fill="x", pady=(6, 0))
+    return bar
+
+
+class Page(ttk.Frame):
+    """한 줄기 화면: 위는 ScrollFrame(``body``), 아래는 스크롤 밖 고정 푸터(``footer``).
+
+    패널 클래스가 이 클래스를 상속해 ``self.body`` 에 폼을, ``self.footer`` 에 실행 버튼 줄을 넣는다.
+    """
+
+    def __init__(
+        self, master: tk.Misc, *, footer: bool = True,
+        max_body_width: Optional[int] = None, align: str = "nw", **kw: object,
+    ) -> None:
+        super().__init__(master, **kw)
+        self.rowconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1)
+        self.scroll = ScrollFrame(self, max_body_width=max_body_width, align=align)
+        self.scroll.grid(row=0, column=0, sticky="nsew")
+        self.body = self.scroll.body
+        self.footer: Optional[ttk.Frame] = _make_footer(self, 1) if footer else None
+
+
+class SplitPane(ttk.Frame):
+    """「목록 + 상세」 화면: ``left``(목록 열) | ``right``(상세 폼, 자체 ScrollFrame) / 아래 고정 ``footer``.
+
+    - ``left`` 는 창 높이에 묶인다 — 안의 목록/표가 남는 높이를 채우고 안에서 스크롤한다.
+      검색칸·버튼처럼 고정돼야 할 것은 ``left`` 안에서 grid 로 목록 위·아래에 둔다.
+    - ``right`` 는 자기 ScrollFrame 의 body — 폼이 길면 이 열만 스크롤된다.
+    - ``grow="left"`` : 목록 열이 남는 폭을 가지고 폼은 내용 폭을 유지 (인물·항구).
+      ``grow="right"``: 목록은 내용 폭을 유지하고 폼 열이 남는 폭을 가진다 (함선).
+    """
+
+    def __init__(
+        self, master: tk.Misc, *, grow: str = "left", footer: bool = True,
+        right_max_width: Optional[int] = None, **kw: object,
+    ) -> None:
+        super().__init__(master, **kw)
+        left_grow = grow == "left"
+        self.rowconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1 if left_grow else 0)
+        self.columnconfigure(1, weight=0 if left_grow else 1)
+        self.left = ttk.Frame(self)
+        self.left.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        self.scroll = ScrollFrame(self, request_width=left_grow, max_body_width=right_max_width)
+        self.scroll.grid(row=0, column=1, sticky="nsew")
+        self.right = self.scroll.body
+        self.footer: Optional[ttk.Frame] = None
+        if footer:
+            self.rowconfigure(1, weight=0)
+            self.footer = _make_footer(self, 1, columnspan=2)
 
 
 def add_scroll_page(
@@ -267,25 +352,23 @@ def _on_wheel(event: tk.Event, horizontal: bool = False) -> Optional[str]:
     return None
 
 
-def _class_wheel(widget_class: str, tcl_cmd: str) -> Callable[[tk.Event], Optional[str]]:
-    """콤보박스/스핀박스 휠: 바깥 스크롤 영역이 움직일 수 있으면 화면을 스크롤, 아니면 원래 동작."""
-    def handler(event: tk.Event) -> Optional[str]:
-        w = event.widget
-        notches = int(event.delta / 120) if event.delta else 0
-        for sf in _scroll_frame_of(w):
-            if sf.scroll_units(-notches):
-                return "break"
-        try:
-            w.tk.call(tcl_cmd, str(w), -int(event.delta / 120))
-        except tk.TclError:
-            pass
-        return "break"
-    return handler
+def _class_wheel(event: tk.Event) -> str:
+    """콤보박스/스핀박스 휠: 값은 절대 바꾸지 않는다. 가장 가까운 스크롤 영역이 움직일 수 있으면 그것을 스크롤, 아니면 무시."""
+    notches = int(event.delta / 120) if event.delta else 0
+    for sf in _scroll_frame_of(event.widget):
+        if sf.scroll_units(-notches):
+            break
+    return "break"
 
 
 def _on_focus_in(event: tk.Event) -> None:
     for sf in _scroll_frame_of(event.widget):
         sf.reveal(event.widget)
+
+
+def install_wheel_policy(widget: tk.Misc) -> None:
+    """휠 정책을 프로그램 전체에 한 번 설치 (ScrollFrame 생성 시 자동, 앱 시작 때 명시 호출도 가능)."""
+    _install_wheel(widget)
 
 
 def _install_wheel(widget: tk.Misc) -> None:
@@ -297,8 +380,8 @@ def _install_wheel(widget: tk.Misc) -> None:
     root.bind_all("<MouseWheel>", lambda e: _on_wheel(e, False), add="+")
     root.bind_all("<Shift-MouseWheel>", lambda e: _on_wheel(e, True), add="+")
     root.bind_all("<FocusIn>", _on_focus_in, add="+")
-    root.bind_class("TCombobox", "<MouseWheel>", _class_wheel("TCombobox", "ttk::combobox::Scroll"))
-    root.bind_class("TSpinbox", "<MouseWheel>", _class_wheel("TSpinbox", "ttk::spinbox::MouseWheel"))
+    for cls in _WHEEL_VALUE:
+        root.bind_class(cls, "<MouseWheel>", _class_wheel)
 
 
 # ---------------------------------------------------------------------------

@@ -27,7 +27,7 @@ from horiedit_py.gui.help_dialog import (
     show_whats_new,
 )
 from horiedit_py.gui.hero_tab import HeroTab
-from horiedit_py.gui.layout import add_scroll_page, fit_main_window, track_wraplength
+from horiedit_py.gui.layout import add_scroll_page, fit_main_window, install_wheel_policy, track_wraplength
 from horiedit_py.gui import shortcut_ui
 from horiedit_py.gui.person_tab import PersonTab
 from horiedit_py.gui.port_tab import PortTab
@@ -107,6 +107,7 @@ class EditorApp:
 
         root.title(_TITLE)
         fit_main_window(root, _MIN_SIZE, _PREF_SIZE)
+        install_wheel_policy(root)   # 휠은 콤보박스/스핀박스 값을 바꾸지 않는다
 
         icon_path = _resource_path("assets", "icon.ico")
         if icon_path.is_file():
@@ -350,15 +351,15 @@ class EditorApp:
         self._notebook = ttk.Notebook(self._root)
         self._notebook.pack(side="top", fill="both", expand=True, padx=8, pady=4)
 
-        # 내용이 창보다 커질 수 있는 탭은 ScrollFrame 에 담아 잘리는 대신 스크롤되게 한다.
-        # 안에 sub-notebook 이 있는 탭([선박]·[항구]·[게임 전체])은 sub-tab 마다 따로 스크롤한다.
+        # 폼만 있는 [주인공] 탭은 ScrollFrame 에 담아 잘리는 대신 스크롤되게 한다.
+        # 「목록 + 상세」 탭([인물]·[선박]·[항구])은 SplitPane — 목록은 창 높이에 묶이고 상세 폼은 자체 스크롤,
+        # 실행 버튼 줄은 스크롤 밖 하단 고정. [게임 전체] 의 각 sub-tab 도 같은 규칙(Page/SplitPane).
         self._hero_tab, _ = add_scroll_page(
             self._notebook, lambda p: HeroTab(p, state), "주인공",
             max_body_width=900, align="n",
         )
-        self._person_tab, _ = add_scroll_page(
-            self._notebook, lambda p: PersonTab(p, state), "인물",
-        )
+        self._person_tab = PersonTab(self._notebook, state)
+        self._notebook.add(self._person_tab, text="인물")
         self._ship_tab = ShipTab(self._notebook, state)
         self._port_tab = PortTab(self._notebook, state)
         self._settings_tab = SettingsTab(self._notebook, state)

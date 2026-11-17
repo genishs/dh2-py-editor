@@ -25,14 +25,14 @@ from horiedit_py.data.game import (
     restore_hull_cap_backup,
     save_hull_caps,
 )
-from horiedit_py.gui.layout import track_wraplength
+from horiedit_py.gui.layout import Page, track_wraplength
 
 
-class HullCapPanel(ttk.Frame):
+class HullCapPanel(Page):
     """신조 내구도 상한 패널 (게임 전체 탭의 sub-tab)."""
 
     def __init__(self, master: tk.Misc, state: EditorState) -> None:
-        super().__init__(master, padding=14)
+        super().__init__(master, footer=True, max_body_width=980, padding=14)
         self._state = state
         self._main_exe: Optional[Path] = None
         self._disk_caps: list[tuple[int, int]] = []
@@ -99,7 +99,7 @@ class HullCapPanel(ttk.Frame):
         self._update_backup_label()
 
     def _build(self) -> None:
-        outer = self
+        outer = self.body
 
         header = ttk.Label(
             outer,
@@ -117,7 +117,7 @@ class HullCapPanel(ttk.Frame):
         apply_note = ttk.Label(
             outer,
             text="⚡ [적용] / [백업에서 복원] 버튼을 누르면 바로 게임 파일(MAIN.EXE)에 반영됩니다 "
-                 "— 위쪽 [저장] 버튼은 필요 없습니다.",
+                 "— 위쪽 [저장] 버튼은 필요 없습니다. 되돌리기: [백업에서 복원].",
             foreground="#a40", justify="left",
         )
         apply_note.pack(side="top", fill="x", pady=(0, 10))
@@ -151,8 +151,8 @@ class HullCapPanel(ttk.Frame):
         ).pack(side="left", padx=8)
         self._editable_widgets.append(self._sp_cap)
 
-        btns = ttk.Frame(outer)
-        btns.pack(side="top", fill="x", pady=(12, 0))
+        # 실행 버튼 줄 — 스크롤 밖 하단 고정 푸터
+        btns = self.footer
         self._btn_apply = ttk.Button(btns, text="적용", command=self._on_apply)
         self._btn_apply.pack(side="left", padx=4)
         self._btn_default = ttk.Button(

@@ -13,11 +13,11 @@ from typing import Dict, Optional
 from horiedit_py.common import EditorState
 from horiedit_py.data import canal as _canal
 from horiedit_py.gui import canal_logic as logic
-from horiedit_py.gui.layout import track_wraplength
+from horiedit_py.gui.layout import Page, track_wraplength
 
 _INTRO = (
     "수에즈·파나마 운하를 열거나 닫습니다. 게임 폴더의 지도 파일(WORLDMAP.LZW)을 바꿉니다.\n"
-    "· ⚡ [개통] / [원상복원] 버튼을 누르면 바로 게임 파일(WORLDMAP.LZW)에 반영됩니다 — 위쪽 [저장] 버튼은 필요 없습니다.\n"
+    "· ⚡ [개통] / [원상복원] 버튼을 누르면 바로 게임 파일(WORLDMAP.LZW)에 반영됩니다 — 위쪽 [저장] 버튼은 필요 없습니다. 되돌리기: [원상복원].\n"
     "· 바꾸기 전에 게임(DOSBox)을 완전히 종료하세요.\n"
     "· 첫 변경 때 원본 백업(WORLDMAP.LZW.canal-orig)이 자동으로 만들어집니다.\n"
     "· 항구 [자동 이동] 은 운하를 쓰지 않습니다. 운하 근처까지 가서 직접 조종해 지나가야 합니다.\n"
@@ -25,11 +25,11 @@ _INTRO = (
 )
 
 
-class CanalPanel(ttk.Frame):
+class CanalPanel(Page):
     """운하 한 줄씩(수에즈·파나마): 현재 상태 + [개통]/[원상복원] 버튼."""
 
     def __init__(self, master: tk.Misc, state: EditorState) -> None:
-        super().__init__(master, padding=8)
+        super().__init__(master, footer=True, max_body_width=980, padding=8)
         self._state = state
         self._path: Optional[Path] = None
         self._states: Optional[Dict[str, str]] = None
@@ -37,15 +37,7 @@ class CanalPanel(ttk.Frame):
         self._status_labels: Dict[str, ttk.Label] = {}
         self._buttons: Dict[str, ttk.Button] = {}
 
-        intro = ttk.Label(self, text=_INTRO, foreground="#666", justify="left")
-        intro.pack(side="top", fill="x", pady=(0, 6))
-        track_wraplength(intro)
-
-        self._path_label = ttk.Label(self, text="", foreground="#555", justify="left")
-        self._path_label.pack(side="top", fill="x", pady=(0, 6))
-        track_wraplength(self._path_label)
-
-        self._box = ttk.LabelFrame(self, text="운하", padding=8)
+        self._box = ttk.LabelFrame(self.body, text="운하", padding=8)
         self._box.pack(side="top", fill="x")
         self._box.columnconfigure(1, weight=1)
         for r, key in enumerate(logic.CANAL_ORDER):
@@ -63,12 +55,19 @@ class CanalPanel(ttk.Frame):
             self._status_labels[key] = lab
             self._buttons[key] = btn
 
-        self._msg_label = ttk.Label(self, text="", foreground="#a00", justify="left")
+        self._msg_label = ttk.Label(self.body, text="", foreground="#a00", justify="left")
         self._msg_label.pack(side="top", fill="x", pady=(8, 0))
         track_wraplength(self._msg_label)
 
-        bar = ttk.Frame(self)
-        bar.pack(side="top", fill="x", pady=(8, 0))
+        # 설명·지도 파일 경로는 조작 줄(개통/원상복원) 아래 — 낮은 창에서도 버튼이 먼저 보이게
+        self._path_label = ttk.Label(self.body, text="", foreground="#555", justify="left")
+        self._path_label.pack(side="top", fill="x", pady=(10, 6))
+        track_wraplength(self._path_label)
+        intro = ttk.Label(self.body, text=_INTRO, foreground="#666", justify="left")
+        intro.pack(side="top", fill="x", pady=(0, 6))
+        track_wraplength(intro)
+
+        bar = self.footer   # 스크롤 밖 하단 고정 푸터
         self._btn_refresh = ttk.Button(bar, text="상태 다시 읽기", command=self.refresh)
         self._btn_refresh.pack(side="left")
 

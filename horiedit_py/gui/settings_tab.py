@@ -35,15 +35,13 @@ from horiedit_py.data.game import (
 )
 from horiedit_py.gui.canal_panel import CanalPanel
 from horiedit_py.gui.hull_cap_panel import HullCapPanel
-from horiedit_py.gui.layout import add_scroll_page, track_wraplength
+from horiedit_py.gui.layout import SplitPane, track_wraplength
 from horiedit_py.gui.widget_state import cascade_state as _cascade_state
 
 
 _HEADER_HINT = (
     "이 탭의 설정은 이 게임 폴더의 모든 세이브(와 새 게임)에 공통으로 적용됩니다 — 세이브 칸과 무관합니다.\n"
-    "· 함선 기본 성능 · 함선 이름·모양 · 신조 내구도 상한 → 게임 본체 파일(MAIN.EXE)   · 운하 → 지도 파일(WORLDMAP.LZW)\n"
-    "· 반영 방식: 함선 두 곳은 [저장]을 눌러야 반영 / 신조 내구도 상한·운하는 버튼을 누르면 바로 반영 (각 sub-tab 위에도 표시)\n"
-    "· 되돌리기: 신조 내구도 상한은 [백업에서 복원], 운하는 [원상복원]. 편집 전 게임 본체 파일 복사를 권장합니다."
+    "각 sub-tab 위에 바꾸는 파일 · 반영 방식([저장] 필요 / 버튼 즉시) · 되돌리는 방법이 적혀 있습니다."
 )
 
 _NO_MAINEXE_MSG = (
@@ -51,13 +49,9 @@ _NO_MAINEXE_MSG = (
     "저장 파일과 게임이 함께 있는 게임 폴더에서 실행해 주세요."
 )
 
-# 설명·폼 위주 화면(내구도 상한·운하)의 최대 폭 — 창이 아무리 커도 이 폭을 넘어 늘어나지 않는다
-_FORM_MAX_W = 980
-
 _EXPERIMENTAL_TEXT = (
-    "⚠️ 시험 기능 — 이 화면의 항목 편집은 게임 실행에 오류를 일으킬 수 있습니다.\n"
-    "   분석이 완전치 않거나 덜 밝혀진 영역을 직접 편집합니다.\n"
-    "   편집 전 게임 본체 파일(MAIN.EXE)을 반드시 복사해 두세요."
+    "⚠️ 시험 기능 — 분석이 덜 된 영역을 직접 편집하므로 게임 실행에 오류가 날 수 있습니다. "
+    "편집 전 게임 본체 파일(MAIN.EXE)을 반드시 복사해 두세요."
 )
 
 _SAVE_MODE_TEXT = (
@@ -242,39 +236,37 @@ class SettingsTab(ttk.Frame):
         # 1) 함선 기본 성능 — MAIN.EXE, 메인 [저장]
         if main_exe is not None:
             names = _ship_display_names(self._state)
-            self._ship4_panel, sf = add_scroll_page(
-                nb, lambda p: _Ship4Panel(p, self._state, main_exe, names), T["ship4"],
-            )
+            self._ship4_panel = _Ship4Panel(nb, self._state, main_exe, names)
+            nb.add(self._ship4_panel, text=T["ship4"])
             self._ship4_panel.add_dirty_listener(self._on_panel_dirty)
             self._ship4_panel.set_enabled(True)
+            self._sub_pages["ship4"] = self._ship4_panel
         else:
-            _pg, sf = add_scroll_page(nb, self._missing_mainexe_page, T["ship4"])
-        self._sub_pages["ship4"] = sf
+            pg = self._missing_mainexe_page(nb)
+            nb.add(pg, text=T["ship4"])
+            self._sub_pages["ship4"] = pg
 
         # 2) 함선 이름·모양 — MAIN.EXE, 메인 [저장]
         if main_exe is not None:
-            self._ship5_panel, sf = add_scroll_page(
-                nb, lambda p: _Ship5Panel(p, self._state, main_exe, names), T["ship5"],
-            )
+            self._ship5_panel = _Ship5Panel(nb, self._state, main_exe, names)
+            nb.add(self._ship5_panel, text=T["ship5"])
             self._ship5_panel.add_dirty_listener(self._on_panel_dirty)
             self._ship5_panel.set_enabled(True)
+            self._sub_pages["ship5"] = self._ship5_panel
         else:
-            _pg, sf = add_scroll_page(nb, self._missing_mainexe_page, T["ship5"])
-        self._sub_pages["ship5"] = sf
+            pg = self._missing_mainexe_page(nb)
+            nb.add(pg, text=T["ship5"])
+            self._sub_pages["ship5"] = pg
 
         # 3) 신조 내구도 상한 — MAIN.EXE, 버튼으로 즉시 반영 (자체적으로 MAIN.EXE 없음 처리)
-        self._hull_cap_panel, sf = add_scroll_page(
-            nb, lambda p: HullCapPanel(p, self._state), T["hullcap"],
-            max_body_width=_FORM_MAX_W,
-        )
-        self._sub_pages["hullcap"] = sf
+        self._hull_cap_panel = HullCapPanel(nb, self._state)
+        nb.add(self._hull_cap_panel, text=T["hullcap"])
+        self._sub_pages["hullcap"] = self._hull_cap_panel
 
         # 4) 운하 — WORLDMAP.LZW 만 필요 (MAIN.EXE·세이브 칸과 무관), 버튼으로 즉시 반영
-        self._canal_panel, sf = add_scroll_page(
-            nb, lambda p: CanalPanel(p, self._state), T["canal"],
-            max_body_width=_FORM_MAX_W,
-        )
-        self._sub_pages["canal"] = sf
+        self._canal_panel = CanalPanel(nb, self._state)
+        nb.add(self._canal_panel, text=T["canal"])
+        self._sub_pages["canal"] = self._canal_panel
 
         if prev_sel in self._sub_pages:
             self.select_subtab(prev_sel)
@@ -287,7 +279,7 @@ class SettingsTab(ttk.Frame):
 # ---------------------------------------------------------------------------
 
 
-class _Ship4Panel(ttk.Frame):
+class _Ship4Panel(SplitPane):
     """Ship4 ROM 편집 (확정 위치 0x0407DA = record + 2). lrudder/lsail/lcrew/dcrew/capacity/lnowea."""
 
     def __init__(
@@ -297,7 +289,7 @@ class _Ship4Panel(ttk.Frame):
         main_exe,
         ship_names: list[str],
     ) -> None:
-        super().__init__(master, padding=8)
+        super().__init__(master, grow="right", padding=8)
         self._state = state
         self._main_exe = main_exe
         self._ship_names = ship_names
@@ -324,25 +316,23 @@ class _Ship4Panel(ttk.Frame):
             v.trace_add("write", self._on_var_write)
 
     def _build(self) -> None:
-        _experimental_banner(self)
-        # 좌측 함선 목록
-        left = ttk.Frame(self)
-        left.pack(side="left", fill="y", padx=(0, 8))
+        # 좌측 함선 목록 — 창 높이에 묶여 안에서 스크롤 (SplitPane.left)
+        left = self.left
         ttk.Label(left, text="함선 종류 (25종):").pack(side="top", anchor="w")
         list_frame = ttk.Frame(left)
-        list_frame.pack(side="top", fill="y", expand=True)
+        list_frame.pack(side="top", fill="both", expand=True)
         self._listbox = tk.Listbox(list_frame, height=8, exportselection=False, width=22)
         sb = ttk.Scrollbar(list_frame, orient="vertical", command=self._listbox.yview)
         self._listbox.configure(yscrollcommand=sb.set)
-        self._listbox.pack(side="left", fill="y", expand=True)
+        self._listbox.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
         for i, name in enumerate(self._ship_names):
             self._listbox.insert("end", f"{i + 1}. {name}")
         self._listbox.bind("<<ListboxSelect>>", self._on_ship_selected)
 
-        # 우측 폼
-        right = ttk.Frame(self)
-        right.pack(side="left", fill="both", expand=True)
+        # 우측 폼 — 자체 ScrollFrame (SplitPane.right). 안내/경고도 이 열 맨 위에 둔다.
+        right = self.right
+        _experimental_banner(right)
 
         form = ttk.LabelFrame(right, text="함선 기본 성능", padding=8)
         form.pack(side="top", fill="x")
@@ -366,9 +356,8 @@ class _Ship4Panel(ttk.Frame):
         self._add_spin(form, 5, "최대 적재량", self._var_capacity, 0, 65535)
         self._add_spin(form, 6, "최대 무기수", self._var_lnowea, 0, 255)
 
-        # 버튼
-        btns = ttk.Frame(right)
-        btns.pack(side="top", fill="x", pady=8)
+        # 버튼 — 스크롤 밖 하단 고정 푸터
+        btns = self.footer
         self._btn_reload = ttk.Button(btns, text="다시 불러오기", command=self._on_reload)
         self._btn_reload.pack(side="right", padx=4)
         self._btn_save = ttk.Button(btns, text="저장", command=self._on_save)
@@ -559,7 +548,7 @@ class _Ship4Panel(ttk.Frame):
 # ---------------------------------------------------------------------------
 
 
-class _Ship5Panel(ttk.Frame):
+class _Ship5Panel(SplitPane):
     """Ship5 ROM 편집 (확정 위치 0x040566). name(18B), sform, bform 상위 4비트."""
 
     def __init__(
@@ -569,7 +558,7 @@ class _Ship5Panel(ttk.Frame):
         main_exe,
         ship_names: list[str],
     ) -> None:
-        super().__init__(master, padding=8)
+        super().__init__(master, grow="right", padding=8)
         self._state = state
         self._main_exe = main_exe
         self._ship_names = ship_names
@@ -590,25 +579,23 @@ class _Ship5Panel(ttk.Frame):
             v.trace_add("write", self._on_var_write)
 
     def _build(self) -> None:
-        _experimental_banner(self)
-        # 좌측 함선 목록
-        left = ttk.Frame(self)
-        left.pack(side="left", fill="y", padx=(0, 8))
+        # 좌측 함선 목록 — 창 높이에 묶여 안에서 스크롤 (SplitPane.left)
+        left = self.left
         ttk.Label(left, text="함선 종류 (25종):").pack(side="top", anchor="w")
         list_frame = ttk.Frame(left)
-        list_frame.pack(side="top", fill="y", expand=True)
+        list_frame.pack(side="top", fill="both", expand=True)
         self._listbox = tk.Listbox(list_frame, height=8, exportselection=False, width=22)
         sb = ttk.Scrollbar(list_frame, orient="vertical", command=self._listbox.yview)
         self._listbox.configure(yscrollcommand=sb.set)
-        self._listbox.pack(side="left", fill="y", expand=True)
+        self._listbox.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
         for i, name in enumerate(self._ship_names):
             self._listbox.insert("end", f"{i + 1}. {name}")
         self._listbox.bind("<<ListboxSelect>>", self._on_ship_selected)
 
-        # 우측 폼
-        right = ttk.Frame(self)
-        right.pack(side="left", fill="both", expand=True)
+        # 우측 폼 — 자체 ScrollFrame (SplitPane.right). 안내/경고도 이 열 맨 위에 둔다.
+        right = self.right
+        _experimental_banner(right)
 
         form = ttk.LabelFrame(right, text="함선 이름·모양", padding=8)
         form.pack(side="top", fill="x")
@@ -639,9 +626,8 @@ class _Ship5Panel(ttk.Frame):
             foreground="#888",
         ).grid(row=3, column=0, columnspan=2, sticky="w", padx=4)
 
-        # 버튼
-        btns = ttk.Frame(right)
-        btns.pack(side="top", fill="x", pady=8)
+        # 버튼 — 스크롤 밖 하단 고정 푸터
+        btns = self.footer
         self._btn_reload = ttk.Button(btns, text="다시 불러오기", command=self._on_reload)
         self._btn_reload.pack(side="right", padx=4)
         self._btn_save = ttk.Button(btns, text="저장", command=self._on_save)

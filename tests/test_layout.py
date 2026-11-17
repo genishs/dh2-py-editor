@@ -4,6 +4,7 @@
 """
 import os
 import sys
+import time
 import unittest
 from pathlib import Path
 
@@ -13,6 +14,18 @@ import tkinter as tk  # noqa: E402
 from tkinter import ttk  # noqa: E402
 
 from horiedit_py.gui import layout  # noqa: E402
+
+def _make_root():
+    """Tk 루트 생성. 화면이 없으면 건너뛴다. (tk.tcl 읽기가 드물게 일시 실패하는 환경이 있어 몇 번 다시 시도)"""
+    last = None
+    for _ in range(4):
+        try:
+            return tk.Tk()
+        except tk.TclError as e:
+            last = e
+            time.sleep(0.4)
+    raise unittest.SkipTest(f"Tk 화면 없음: {last}")
+
 
 GUI_DIR = Path(__file__).resolve().parent.parent / "horiedit_py" / "gui"
 
@@ -75,10 +88,7 @@ class FitMainWindowTest(unittest.TestCase):
 class ScrollFrameTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        try:
-            cls.root = tk.Tk()
-        except tk.TclError as e:  # 화면 없음
-            raise unittest.SkipTest(f"Tk 화면 없음: {e}")
+        cls.root = _make_root()
         cls.root.geometry("+0+0")
 
     @classmethod
@@ -147,6 +157,26 @@ class ScrollFrameTest(unittest.TestCase):
         finally:
             sf.destroy()
 
+    def test_canvas_refills_after_shrink_then_grow(self):
+        """창을 줄였다(스크롤바 생김) 키우면(스크롤바 사라짐) 캔버스가 옛 크기로 남던 문제."""
+        sf, inner = self._make(300, 500, 600, 700)
+        try:
+            def settle():
+                for _ in range(5):
+                    self.root.update_idletasks()
+                    self.root.update()
+            self.root.geometry("600x300")
+            settle()
+            self.assertTrue(sf._vbar.winfo_ismapped())
+            self.root.geometry("900x700")
+            settle()
+            self.assertFalse(sf._vbar.winfo_ismapped())
+            self.assertGreaterEqual(sf._canvas.winfo_width(), sf.winfo_width() - 2)
+            self.assertGreaterEqual(sf._canvas.winfo_height(), sf.winfo_height() - 2)
+            self.assertGreaterEqual(inner.winfo_width(), sf.winfo_width() - 2)
+        finally:
+            sf.destroy()
+
     def test_max_body_width_caps_and_left_aligns(self):
         sf, inner = self._make(300, 100, 1200, 400, max_body_width=500)
         try:
@@ -198,10 +228,7 @@ class GameWidePlacementTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        try:
-            cls.root = tk.Tk()
-        except tk.TclError as e:
-            raise unittest.SkipTest(f"Tk 화면 없음: {e}")
+        cls.root = _make_root()
 
     @classmethod
     def tearDownClass(cls):

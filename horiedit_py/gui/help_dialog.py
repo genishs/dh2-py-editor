@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import tkinter as tk
 import webbrowser
+from tkinter import font as tkfont
 from tkinter import ttk
 
 from horiedit_py import __version__
@@ -116,6 +117,10 @@ _GETTING_STARTED_TEXT = """\
    (운하는 게임 폴더 단위로 적용됩니다. 세이브와
    무관하게 그 폴더의 모든 세이브와 새 게임에
    똑같이 적용됩니다.)
+
+▶ 값은 화살표나 키보드로 바꾸세요
+   마우스 휠은 숫자·선택 칸의 값을 바꾸지 않습니다
+   (휠은 화면만 스크롤합니다).
 
 ▶ 게임을 켠 채로 편집하지 마세요
    게임(DOSBox 등)을 완전히 종료한 뒤 편집하고,
@@ -329,8 +334,30 @@ def _show_scrolling_text(
     outer = ttk.Frame(win, padding=10)
     outer.pack(fill="both", expand=True)
 
+    check_var = tk.BooleanVar(value=checkbox_initial)
+
+    def _do_close() -> None:
+        if on_close is not None:
+            try:
+                on_close(bool(check_var.get()))
+            except Exception:
+                pass
+        win.destroy()
+
+    # 버튼 줄을 아래쪽에 먼저 확보하고 본문(text_frame)이 남는 공간을 가진다 — 작은 창에서도 [닫기] 가 안 잘린다
+    btns = ttk.Frame(outer)
+    btns.pack(side="bottom", fill="x", pady=(8, 0))
+    if checkbox_label is not None:
+        ttk.Checkbutton(
+            btns, text=checkbox_label, variable=check_var,
+        ).pack(side="left", padx=4)
+    if extra_button is not None:
+        label, cmd = extra_button
+        ttk.Button(btns, text=label, command=cmd).pack(side="left", padx=4)
+    ttk.Button(btns, text="닫기", command=_do_close).pack(side="right", padx=4)
+
     text_frame = ttk.Frame(outer)
-    text_frame.pack(fill="both", expand=True)
+    text_frame.pack(side="top", fill="both", expand=True)
     txt = tk.Text(
         text_frame, width=width, height=height, wrap="word",
         font=("Malgun Gothic", 10),
@@ -342,29 +369,17 @@ def _show_scrolling_text(
     txt.pack(side="left", fill="both", expand=True)
     sb.pack(side="right", fill="y")
 
-    check_var = tk.BooleanVar(value=checkbox_initial)
-
-    def _do_close() -> None:
-        if on_close is not None:
-            try:
-                on_close(bool(check_var.get()))
-            except Exception:
-                pass
-        win.destroy()
-
-    btns = ttk.Frame(outer)
-    # 버튼 줄을 아래쪽에 먼저 확보하고 본문(text_frame)이 남는 공간을 가진다 — 작은 창에서도 [닫기] 가 안 잘린다
-    btns.pack(side="bottom", fill="x", pady=(8, 0))
-    text_frame.pack_forget()
-    text_frame.pack(side="top", fill="both", expand=True)
-    if checkbox_label is not None:
-        ttk.Checkbutton(
-            btns, text=checkbox_label, variable=check_var,
-        ).pack(side="left", padx=4)
-    if extra_button is not None:
-        label, cmd = extra_button
-        ttk.Button(btns, text=label, command=cmd).pack(side="left", padx=4)
-    ttk.Button(btns, text="닫기", command=_do_close).pack(side="right", padx=4)
+    # 본문이 다 보이는 높이로 연다 (화면을 넘으면 화면에 맞추고 나머지는 스크롤).
+    # 줄 수는 글꼴 폭으로 직접 어림한다 (창이 뜨기 전이라 Text 의 줄 계산을 쓸 수 없다).
+    try:
+        fnt = tkfont.Font(font=txt.cget("font"))
+        line_px = max(1, fnt.metrics("linespace"))
+        text_w = max(1, width * fnt.measure("0"))
+        lines = sum(max(1, -(-fnt.measure(ln) // text_w)) for ln in body.splitlines())
+        max_lines = max(8, (txt.winfo_screenheight() - 260) // line_px)
+        txt.configure(height=min(max(lines + 2, 6), max_lines))
+    except (tk.TclError, ValueError):
+        pass
 
     win.protocol("WM_DELETE_WINDOW", _do_close)
     win.grab_set()

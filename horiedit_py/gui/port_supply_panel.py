@@ -18,7 +18,7 @@ from horiedit_py.data.port import (
     port_supply_is_standard,
     save_port_supply,
 )
-from horiedit_py.gui.layout import track_wraplength
+from horiedit_py.gui.layout import SplitPane, track_wraplength
 from horiedit_py.gui.widget_state import cascade_state as _cascade_state
 
 
@@ -32,7 +32,7 @@ def _decode_supply_byte_display(b: int) -> str:
     return f"(값 {b})"
 
 
-class PortSupplyPanel(ttk.Frame):
+class PortSupplyPanel(SplitPane):
     """항구 공급 수치 편집 (record +14..+23, 10 byte/port).
 
     표준 항구 (0..99) 는 0x2E..0x39 (ASCII digit/dot) 인코딩.
@@ -40,7 +40,7 @@ class PortSupplyPanel(ttk.Frame):
     """
 
     def __init__(self, master: tk.Misc, state: EditorState) -> None:
-        super().__init__(master, padding=8)
+        super().__init__(master, grow="right", padding=8)
         self._state = state
         self._idx = 0
         self._enabled = False
@@ -106,8 +106,9 @@ class PortSupplyPanel(ttk.Frame):
     # -------- 빌드 --------
 
     def _build(self) -> None:
+        right = self.right   # 상세 열(자체 스크롤) — 안내·경고도 이 열 맨 위
         mode = ttk.Label(
-            self,
+            right,
             text=("💾 세이브 칸(KOUKAI2.DAT)의 항구 데이터입니다 — 위쪽 [저장]으로 반영되고(이 화면의 [저장]도 같은 동작), "
                   "[초기화]로 되돌립니다."),
             foreground="#246", justify="left",
@@ -117,7 +118,7 @@ class PortSupplyPanel(ttk.Frame):
 
         # 추가 경고 — 이 패널 특정 (사용자 검증 결과 가격 직접 영향 없음 확인됨)
         sub_warn = ttk.Label(
-            self,
+            right,
             text=(
                 "⚠️ 확인 결과: 이 값을 바꿔도 시장 가격에 바로 영향이 나타나지 않았습니다.\n"
                 "    게임이 값을 읽긴 하지만(한 달 뒤 자동 갱신 확인) 실제 효과는 분명치 않습니다.\n"
@@ -129,45 +130,44 @@ class PortSupplyPanel(ttk.Frame):
             justify="left",
         )
         sub_warn.pack(side="top", fill="x", padx=4, pady=(0, 6))
+        track_wraplength(sub_warn)
 
-        # 좌측 항구 목록
-        left = ttk.Frame(self)
-        left.pack(side="left", fill="y", padx=(0, 8))
+        # 좌측 항구 목록 — 창 높이에 묶여 안에서 스크롤
+        left = self.left
         ttk.Label(left, text="항구 (130곳):").pack(side="top", anchor="w")
         list_frame = ttk.Frame(left)
-        list_frame.pack(side="top", fill="y", expand=True)
+        list_frame.pack(side="top", fill="both", expand=True)
         self._listbox = tk.Listbox(
             list_frame, height=8, exportselection=False, width=22,
         )
         sb = ttk.Scrollbar(list_frame, orient="vertical", command=self._listbox.yview)
         self._listbox.configure(yscrollcommand=sb.set)
-        self._listbox.pack(side="left", fill="y", expand=True)
+        self._listbox.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
         self._listbox.bind("<<ListboxSelect>>", self._on_port_selected)
 
         # 우측 폼
-        right = ttk.Frame(self)
-        right.pack(side="left", fill="both", expand=True)
-
         self._lbl_current = ttk.Label(right, text="(항구 미선택)", foreground="#444")
         self._lbl_current.pack(side="top", anchor="w", pady=(0, 6))
 
         form = ttk.LabelFrame(right, text="공급 수치", padding=8)
         form.pack(side="top", fill="x")
 
+        # 칸 10개를 5행 × 2열로 — 세로 길이를 절반으로 (스크롤 없이 한눈에)
+        half = (PORT_SUPPLY_SIZE + 1) // 2
         for i in range(PORT_SUPPLY_SIZE):
-            ttk.Label(form, text=f"칸 {i + 1}").grid(row=i, column=0, sticky="w", padx=4, pady=2)
+            r, c = i % half, (i // half) * 3
+            ttk.Label(form, text=f"칸 {i + 1}").grid(row=r, column=c, sticky="w", padx=4, pady=2)
             sp = ttk.Spinbox(
                 form, from_=0, to=255, textvariable=self._vars[i], width=6,
             )
-            sp.grid(row=i, column=1, sticky="w", padx=4, pady=2)
-            lbl = ttk.Label(form, text="", foreground="#666")
-            lbl.grid(row=i, column=2, sticky="w", padx=8, pady=2)
+            sp.grid(row=r, column=c + 1, sticky="w", padx=4, pady=2)
+            lbl = ttk.Label(form, text="", foreground="#666", width=8)
+            lbl.grid(row=r, column=c + 2, sticky="w", padx=(8, 18), pady=2)
             self._decoded_labels.append(lbl)
 
-        # 버튼
-        btns = ttk.Frame(right)
-        btns.pack(side="top", fill="x", pady=8)
+        # 버튼 — 스크롤 밖 하단 고정 푸터
+        btns = self.footer
         self._btn_reload = ttk.Button(btns, text="다시 불러오기", command=self._on_reload)
         self._btn_reload.pack(side="right", padx=4)
         self._btn_save = ttk.Button(btns, text="저장", command=self._on_save)
