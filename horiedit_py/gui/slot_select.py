@@ -13,6 +13,7 @@ from typing import Callable, Optional
 
 from horiedit_py.common import EditorState, decode_kr
 from horiedit_py.data import slot_init, slot_is_used
+from horiedit_py.gui.layout import track_wraplength
 
 
 SLOT_COUNT = 10
@@ -80,12 +81,15 @@ class SlotSelectFrame(ttk.Frame):
             row=2, column=0, sticky="w", padx=4, pady=2
         )
 
-        self._lbl_memo = ttk.Label(detail, text="(미선택)", width=60, anchor="w")
+        self._lbl_memo = ttk.Label(detail, text="(미선택)", anchor="w")
         self._lbl_memo.grid(row=0, column=1, sticky="ew", padx=4, pady=2)
-        self._lbl_port = ttk.Label(detail, text="-", width=60, anchor="w")
+        self._lbl_port = ttk.Label(detail, text="-", anchor="w")
         self._lbl_port.grid(row=1, column=1, sticky="ew", padx=4, pady=2)
-        self._lbl_hero = ttk.Label(detail, text="-", width=60, anchor="w")
+        self._lbl_hero = ttk.Label(detail, text="-", anchor="w")
         self._lbl_hero.grid(row=2, column=1, sticky="ew", padx=4, pady=2)
+        # 고정 글자 수(width=60) 대신 폭에 맞춰 줄바꿈 — 좁은 창에서도 상단이 잘리지 않는다
+        for lbl in (self._lbl_memo, self._lbl_port, self._lbl_hero):
+            track_wraplength(lbl, pad=4, min_wrap=120, initial=240)
 
     # ---------------- 라벨 갱신 ----------------
 

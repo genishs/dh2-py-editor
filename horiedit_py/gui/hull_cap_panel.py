@@ -1,9 +1,9 @@
-"""최대 내구도 수정 다이얼로그 — MAIN.EXE 의 신조 cap (issue #5, analysis_N).
+"""신조 내구도 상한 패널 — MAIN.EXE 의 신조 cap (issue #5, analysis_N).
 
-이 다이얼로그는 세이브 슬롯과 무관하게 MAIN.EXE 만 편집한다.
-- 메뉴바: 도구 → 최대 내구도 수정... 으로 호출
-- 모달 (grab_set) — 다이얼로그 닫기 전까지 메인 윈도우 비활성
+[게임 전체] 탭의 한 구역으로 들어간다 (예전에는 [도구] 메뉴의 모달 다이얼로그였다).
+세이브 슬롯과 무관하게 MAIN.EXE 만 편집하고, [저장] 이 아니라 버튼을 누르면 바로 파일에 반영한다.
 - 입력 1 개 (최대 내구도 1..255) → 발견된 모든 cap 위치에 동일 값 일괄 적용
+- 처음 [적용] 때 원본 백업(MAIN.EXE.beforeHullCap) 자동 생성, [백업에서 복원] 으로 되돌림
 
 signature 검색으로 cap byte 위치 자동 탐색 (가이드 hardcoded offset 회피).
 """
@@ -25,48 +25,26 @@ from horiedit_py.data.game import (
     restore_hull_cap_backup,
     save_hull_caps,
 )
+from horiedit_py.gui.layout import track_wraplength
 
 
-def open_hull_cap_dialog(parent: tk.Misc, state: EditorState) -> None:
-    """편의 함수 — 메뉴/버튼 핸들러에서 한 줄 호출용."""
-    HullCapDialog(parent, state)
+class HullCapPanel(ttk.Frame):
+    """신조 내구도 상한 패널 (게임 전체 탭의 sub-tab)."""
 
-
-class HullCapDialog(tk.Toplevel):
-    """최대 내구도 수정 모달 다이얼로그."""
-
-    def __init__(self, parent: tk.Misc, state: EditorState) -> None:
-        super().__init__(parent)
+    def __init__(self, master: tk.Misc, state: EditorState) -> None:
+        super().__init__(master, padding=14)
         self._state = state
         self._main_exe: Optional[Path] = None
         self._disk_caps: list[tuple[int, int]] = []
         self._var_cap = tk.IntVar(value=HULL_CAP_DEFAULT)
         self._editable_widgets: list[tk.Misc] = []
 
-        self.title("최대 내구도 상한 바꾸기")
-        self.transient(parent)
-        self.resizable(False, False)
-        self.protocol("WM_DELETE_WINDOW", self._on_close)
-
         self._build()
         self.reload()
 
-        # 부모 윈도우 위에 띄우기
-        self.update_idletasks()
-        try:
-            px = parent.winfo_rootx()
-            py = parent.winfo_rooty()
-            pw = parent.winfo_width()
-            ph = parent.winfo_height()
-            w = self.winfo_width()
-            h = self.winfo_height()
-            self.geometry(f"+{px + (pw - w) // 2}+{py + (ph - h) // 3}")
-        except tk.TclError:
-            pass
-
-        # 모달
-        self.grab_set()
-        self.focus_set()
+    def _dlg(self) -> tk.Misc:
+        """메시지 상자의 부모 — 이 패널이 놓인 최상위 창."""
+        return self.winfo_toplevel()
 
     # ---------------- 데이터 로드/UI ----------------
 
@@ -121,8 +99,7 @@ class HullCapDialog(tk.Toplevel):
         self._update_backup_label()
 
     def _build(self) -> None:
-        outer = ttk.Frame(self, padding=14)
-        outer.pack(fill="both", expand=True)
+        outer = self
 
         header = ttk.Label(
             outer,
@@ -134,7 +111,17 @@ class HullCapDialog(tk.Toplevel):
             foreground="#246",
             justify="left",
         )
-        header.pack(side="top", fill="x", pady=(0, 12))
+        header.pack(side="top", fill="x", pady=(0, 6))
+        track_wraplength(header)
+
+        apply_note = ttk.Label(
+            outer,
+            text="⚡ [적용] / [백업에서 복원] 버튼을 누르면 바로 게임 파일(MAIN.EXE)에 반영됩니다 "
+                 "— 위쪽 [저장] 버튼은 필요 없습니다.",
+            foreground="#a40", justify="left",
+        )
+        apply_note.pack(side="top", fill="x", pady=(0, 10))
+        track_wraplength(apply_note)
 
         status = ttk.LabelFrame(outer, text="현재 상태", padding=8)
         status.pack(side="top", fill="x", pady=4)
@@ -178,8 +165,6 @@ class HullCapDialog(tk.Toplevel):
         self._btn_restore.pack(side="left", padx=4)
         self._btn_reload = ttk.Button(btns, text="다시 불러오기", command=self.reload)
         self._btn_reload.pack(side="left", padx=4)
-        self._btn_close = ttk.Button(btns, text="닫기", command=self._on_close)
-        self._btn_close.pack(side="right", padx=4)
         self._editable_widgets.extend(
             (self._btn_apply, self._btn_default, self._btn_restore, self._btn_reload)
         )
@@ -211,23 +196,23 @@ class HullCapDialog(tk.Toplevel):
         try:
             val = int(self._var_cap.get())
         except (tk.TclError, ValueError):
-            messagebox.showerror("입력 오류", "최대 내구도 값을 숫자로 입력하세요.", parent=self)
+            messagebox.showerror("입력 오류", "최대 내구도 값을 숫자로 입력하세요.", parent=self._dlg())
             return
         if not (1 <= val <= 255):
-            messagebox.showerror("입력 오류", "최대 내구도는 1~255 사이여야 합니다.", parent=self)
+            messagebox.showerror("입력 오류", "최대 내구도는 1~255 사이여야 합니다.", parent=self._dlg())
             return
         try:
             ensure_hull_cap_backup(self._main_exe)
             pairs = [(o, val) for o, _ in self._disk_caps]
             save_hull_caps(self._main_exe, pairs)
         except Exception as e:
-            messagebox.showerror("적용 실패", str(e), parent=self)
+            messagebox.showerror("적용 실패", str(e), parent=self._dlg())
             return
         messagebox.showinfo(
             "적용 완료",
             f"{len(self._disk_caps)} 곳에 최대 내구도 {val}을(를) 적용했습니다.\n"
             f"게임을 다시 실행해야 반영됩니다.",
-            parent=self,
+            parent=self._dlg(),
         )
         self.reload()
 
@@ -242,28 +227,21 @@ class HullCapDialog(tk.Toplevel):
             messagebox.showinfo(
                 "백업 없음",
                 f"{backup.name} 가 없습니다 — 아직 적용한 적이 없습니다.",
-                parent=self,
+                parent=self._dlg(),
             )
             return
         if not messagebox.askyesno(
             "백업에서 복원",
             f"백업({backup.name})으로 게임 본체 파일을 되돌립니다. 진행할까요?",
-            parent=self,
+            parent=self._dlg(),
         ):
             return
         if restore_hull_cap_backup(self._main_exe):
             messagebox.showinfo(
                 "복원 완료",
                 "게임 본체 파일을 백업 상태로 되돌렸습니다. 게임을 다시 실행해야 반영됩니다.",
-                parent=self,
+                parent=self._dlg(),
             )
             self.reload()
         else:
-            messagebox.showerror("복원 실패", "백업 파일 복원 실패.", parent=self)
-
-    def _on_close(self) -> None:
-        try:
-            self.grab_release()
-        except tk.TclError:
-            pass
-        self.destroy()
+            messagebox.showerror("복원 실패", "백업 파일 복원 실패.", parent=self._dlg())

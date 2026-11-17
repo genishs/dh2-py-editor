@@ -27,7 +27,7 @@ from horiedit_py.gui.help_dialog import (
     show_whats_new,
 )
 from horiedit_py.gui.hero_tab import HeroTab
-from horiedit_py.gui.hull_cap_dialog import open_hull_cap_dialog
+from horiedit_py.gui.layout import add_scroll_page, fit_main_window, track_wraplength
 from horiedit_py.gui import shortcut_ui
 from horiedit_py.gui.person_tab import PersonTab
 from horiedit_py.gui.port_tab import PortTab
@@ -37,20 +37,24 @@ from horiedit_py.gui.slot_select import SlotSelectFrame
 
 
 _TITLE = f"대항해시대 II 세이브 에디터  Ver {__version__}"
-_WIDTH = 980
-_HEIGHT = 700
+# 창 크기 규칙 — 최소 크기 · 선호 기본 크기 (실제 기본 크기는 화면 크기에 맞춰 줄어든다: layout.fit_main_window)
+_MIN_SIZE = (800, 620)
+_PREF_SIZE = (1180, 780)
 
 # 회전형 안내 팁 (발견성 낮은 기능을 상단 배너에 노출)
 _TIPS = (
-    "💡 [도구] ▸ 최대 내구도 상한 바꾸기 — 조선소에서 새로 만드는 배의 내구도 상한을 올릴 수 있어요.",
+    "💡 [게임 전체] 탭 ▸ 신조 내구도 상한 — 조선소에서 새로 만드는 배의 내구도 상한을 올릴 수 있어요.",
     "💡 [인물] 탭의 '소속 변경'으로 인물을 내 동료로 등록할 수 있어요.",
     "💡 [도움말] ▸ 편집 가능한 항목 에서 전체 기능 목록을 볼 수 있어요.",
-    "💡 [게임 설정] 탭에서 함선 종류의 적재량·내구도 등 기본 성능을 바꿀 수 있어요.",
+    "💡 [게임 전체] 탭에서 함선 종류의 적재량·내구도 등 기본 성능과 운하 개통을 바꿀 수 있어요. (모든 세이브에 적용)",
 )
 _TIP_INTERVAL_MS = 8000
 
 # "새 기능 소개" 창을 프로그램 시작 시 열지 여부 설정 (게임 폴더 옆 파일)
 _SEEN_FILENAME = ".dh2editor_seen"
+
+# 게임 전체(모든 세이브 공통) 설정 탭 이름
+_GAME_WIDE_TAB_TITLE = "게임 전체 (모든 세이브)"
 
 
 def _resource_path(*parts: str) -> Path:
@@ -102,8 +106,7 @@ class EditorApp:
         self._tip_after_id: Optional[str] = None
 
         root.title(_TITLE)
-        root.geometry(f"{_WIDTH}x{_HEIGHT}")
-        root.minsize(820, 640)
+        fit_main_window(root, _MIN_SIZE, _PREF_SIZE)
 
         icon_path = _resource_path("assets", "icon.ico")
         if icon_path.is_file():
@@ -133,11 +136,15 @@ class EditorApp:
         file_menu.add_command(label="종료", command=self._on_close)
         menubar.add_cascade(label="파일", menu=file_menu)
 
-        # 도구 — MAIN.EXE 패치 등 슬롯 무관 전역 작업
+        # 도구 — 게임 전체에 적용되는 작업으로 바로 가기 ([게임 전체] 탭의 sub-tab 으로 이동)
         tools_menu = tk.Menu(menubar, tearoff=False)
         tools_menu.add_command(
-            label="최대 내구도 상한 바꾸기...",
-            command=self._on_open_hull_cap,
+            label="신조 내구도 상한...",
+            command=self._goto_hull_cap,
+        )
+        tools_menu.add_command(
+            label="운하 개통 / 원상복원...",
+            command=self._goto_canal,
         )
         menubar.add_cascade(label="도구", menu=tools_menu)
 
@@ -178,8 +185,21 @@ class EditorApp:
 
         self._root.configure(menu=menubar)
 
-    def _on_open_hull_cap(self) -> None:
-        open_hull_cap_dialog(self._root, state)
+    # ---------------- 도구 메뉴: [게임 전체] 탭의 sub-tab 으로 이동 ----------------
+
+    def _goto_game_wide(self, subtab: str) -> None:
+        """[게임 전체] 탭을 열고 해당 sub-tab(``hullcap``/``canal`` …)을 선택."""
+        try:
+            self._notebook.select(self._settings_tab)
+        except tk.TclError:
+            pass
+        self._settings_tab.select_subtab(subtab)
+
+    def _goto_hull_cap(self) -> None:
+        self._goto_game_wide("hullcap")
+
+    def _goto_canal(self) -> None:
+        self._goto_game_wide("canal")
 
     # ---------------- 안내 배너 / 새 기능 소개 ----------------
 
@@ -193,6 +213,7 @@ class EditorApp:
             foreground="#1a5", cursor="hand2",
         )
         lbl.pack(side="left", fill="x", expand=True)
+        track_wraplength(lbl, min_wrap=200)
         lbl.bind("<Button-1>", lambda e: self._on_tip_click())
         ttk.Button(
             banner, text="×", width=3,
@@ -214,11 +235,11 @@ class EditorApp:
             self._tip_after_id = None
 
     def _on_tip_click(self) -> None:
-        """현재 팁이 최대 내구도면 바로 해당 창을 연다 (액션형 팁)."""
+        """현재 팁이 신조 내구도 상한이면 바로 해당 화면으로 간다 (액션형 팁)."""
         # 직전에 표시된 팁 = (_tip_idx - 1) % N
         shown = (self._tip_idx - 1) % len(_TIPS)
         if shown == 0:
-            self._on_open_hull_cap()
+            self._goto_hull_cap()
 
     def _open_whats_new(self, after_close=None) -> None:
         """새 기능 소개 창을 연다 (자동 시작 / 도움말 메뉴 공용).
@@ -276,8 +297,9 @@ class EditorApp:
         # 상단 영역: 좌(슬롯) + 우(액션 + 슬롯 상세)
         top = ttk.Frame(self._root)
         top.pack(side="top", fill="x", padx=8, pady=(8, 4))
-        top.columnconfigure(0, weight=2)
-        top.columnconfigure(1, weight=1)
+        # 슬롯 영역이 남는 폭을 가지고, 액션 버튼은 제 폭을 유지한다 (버튼 글자가 잘리지 않게)
+        top.columnconfigure(0, weight=1)
+        top.columnconfigure(1, weight=0)
 
         # 좌측: 슬롯 선택 + 상세
         self._slot_frame = SlotSelectFrame(
@@ -328,17 +350,22 @@ class EditorApp:
         self._notebook = ttk.Notebook(self._root)
         self._notebook.pack(side="top", fill="both", expand=True, padx=8, pady=4)
 
-        self._hero_tab = HeroTab(self._notebook, state)
-        self._person_tab = PersonTab(self._notebook, state)
+        # 내용이 창보다 커질 수 있는 탭은 ScrollFrame 에 담아 잘리는 대신 스크롤되게 한다.
+        # 안에 sub-notebook 이 있는 탭([선박]·[항구]·[게임 전체])은 sub-tab 마다 따로 스크롤한다.
+        self._hero_tab, _ = add_scroll_page(
+            self._notebook, lambda p: HeroTab(p, state), "주인공",
+            max_body_width=900, align="n",
+        )
+        self._person_tab, _ = add_scroll_page(
+            self._notebook, lambda p: PersonTab(p, state), "인물",
+        )
         self._ship_tab = ShipTab(self._notebook, state)
         self._port_tab = PortTab(self._notebook, state)
         self._settings_tab = SettingsTab(self._notebook, state)
 
-        self._notebook.add(self._hero_tab, text="주인공")
-        self._notebook.add(self._person_tab, text="인물")
         self._notebook.add(self._ship_tab, text="선박")
         self._notebook.add(self._port_tab, text="항구")
-        self._notebook.add(self._settings_tab, text="게임 설정")
+        self._notebook.add(self._settings_tab, text=_GAME_WIDE_TAB_TITLE)
 
         self._tabs = (
             self._hero_tab, self._person_tab, self._ship_tab,

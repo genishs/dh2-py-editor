@@ -147,8 +147,9 @@ class PersonTab(ttk.Frame):
     # ---------------- UI 구성 ----------------
 
     def _build(self) -> None:
+        # 결과 목록(왼쪽)이 남는 폭·높이를 가진다. 편집 폼(오른쪽)은 제 폭을 유지한다.
         self.columnconfigure(0, weight=1)
-        self.columnconfigure(1, weight=2)
+        self.columnconfigure(1, weight=0)
         self.rowconfigure(0, weight=1)
 
         self._build_left()
@@ -169,20 +170,19 @@ class PersonTab(ttk.Frame):
 
         # 검색 입력
         search = ttk.LabelFrame(left, text="검색", padding=8)
-        search.grid(row=0, column=0, sticky="ew")
-        search.columnconfigure(1, weight=1)
+        search.grid(row=0, column=0, sticky="w")  # 검색 칸은 제 폭 유지 (창이 커져도 입력칸만 길어지지 않게)
 
         ttk.Label(search, text="처음 이름").grid(row=0, column=0, sticky="w", padx=2, pady=2)
         self._ent_search_fname = ttk.Entry(
-            search, textvariable=self._var_search_fname
+            search, textvariable=self._var_search_fname, width=30
         )
-        self._ent_search_fname.grid(row=0, column=1, sticky="ew", padx=2, pady=2)
+        self._ent_search_fname.grid(row=0, column=1, sticky="w", padx=2, pady=2)
 
         ttk.Label(search, text="마지막 이름").grid(row=1, column=0, sticky="w", padx=2, pady=2)
         self._ent_search_lname = ttk.Entry(
-            search, textvariable=self._var_search_lname
+            search, textvariable=self._var_search_lname, width=30
         )
-        self._ent_search_lname.grid(row=1, column=1, sticky="ew", padx=2, pady=2)
+        self._ent_search_lname.grid(row=1, column=1, sticky="w", padx=2, pady=2)
 
         btns = ttk.Frame(search)
         btns.grid(row=2, column=0, columnspan=2, sticky="e", pady=(4, 0))
@@ -203,7 +203,7 @@ class PersonTab(ttk.Frame):
 
         cols = ("idx", "fname", "lname", "affiliation", "port")
         self._tv = ttk.Treeview(
-            tv_frame, columns=cols, show="headings", height=14, selectmode="browse"
+            tv_frame, columns=cols, show="headings", height=8, selectmode="browse"
         )
         self._tv.heading("idx", text="번호")
         self._tv.heading("fname", text="처음이름")

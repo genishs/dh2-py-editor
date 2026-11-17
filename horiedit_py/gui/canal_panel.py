@@ -1,4 +1,4 @@
-"""게임 설정 탭의 「운하」 구역 (시험 기능) — 수에즈·파나마 운하 개통/원상복원.
+"""게임 전체 탭의 「운하」 구역 — 수에즈·파나마 운하 개통/원상복원.
 
 표시·버튼 결정은 `canal_logic` (위젯 없는 순수 함수), 파일 변경은 `horiedit_py.data.canal`.
 이 구역은 세이브 칸(slot)이 필요 없다 — 게임 폴더의 지도 파일(WORLDMAP.LZW)만 본다.
@@ -13,9 +13,11 @@ from typing import Dict, Optional
 from horiedit_py.common import EditorState
 from horiedit_py.data import canal as _canal
 from horiedit_py.gui import canal_logic as logic
+from horiedit_py.gui.layout import track_wraplength
 
 _INTRO = (
     "수에즈·파나마 운하를 열거나 닫습니다. 게임 폴더의 지도 파일(WORLDMAP.LZW)을 바꿉니다.\n"
+    "· ⚡ [개통] / [원상복원] 버튼을 누르면 바로 게임 파일(WORLDMAP.LZW)에 반영됩니다 — 위쪽 [저장] 버튼은 필요 없습니다.\n"
     "· 바꾸기 전에 게임(DOSBox)을 완전히 종료하세요.\n"
     "· 첫 변경 때 원본 백업(WORLDMAP.LZW.canal-orig)이 자동으로 만들어집니다.\n"
     "· 항구 [자동 이동] 은 운하를 쓰지 않습니다. 운하 근처까지 가서 직접 조종해 지나가야 합니다.\n"
@@ -35,12 +37,13 @@ class CanalPanel(ttk.Frame):
         self._status_labels: Dict[str, ttk.Label] = {}
         self._buttons: Dict[str, ttk.Button] = {}
 
-        ttk.Label(self, text=_INTRO, foreground="#666", justify="left").pack(
-            side="top", anchor="w", pady=(0, 6)
-        )
+        intro = ttk.Label(self, text=_INTRO, foreground="#666", justify="left")
+        intro.pack(side="top", fill="x", pady=(0, 6))
+        track_wraplength(intro)
 
-        self._path_label = ttk.Label(self, text="", foreground="#555", justify="left", wraplength=720)
-        self._path_label.pack(side="top", anchor="w", pady=(0, 6))
+        self._path_label = ttk.Label(self, text="", foreground="#555", justify="left")
+        self._path_label.pack(side="top", fill="x", pady=(0, 6))
+        track_wraplength(self._path_label)
 
         self._box = ttk.LabelFrame(self, text="운하", padding=8)
         self._box.pack(side="top", fill="x")
@@ -49,8 +52,9 @@ class CanalPanel(ttk.Frame):
             ttk.Label(self._box, text=_canal.CANALS[key].name).grid(
                 row=r, column=0, sticky="w", padx=4, pady=4
             )
-            lab = ttk.Label(self._box, text="", wraplength=380, justify="left")
-            lab.grid(row=r, column=1, sticky="w", padx=8, pady=4)
+            lab = ttk.Label(self._box, text="", justify="left")
+            lab.grid(row=r, column=1, sticky="ew", padx=8, pady=4)
+            track_wraplength(lab, min_wrap=200)
             btn = ttk.Button(
                 self._box, text=logic.BTN_OPEN, width=10,
                 command=lambda k=key: self._on_toggle(k),
@@ -60,7 +64,8 @@ class CanalPanel(ttk.Frame):
             self._buttons[key] = btn
 
         self._msg_label = ttk.Label(self, text="", foreground="#a00", justify="left")
-        self._msg_label.pack(side="top", anchor="w", pady=(8, 0))
+        self._msg_label.pack(side="top", fill="x", pady=(8, 0))
+        track_wraplength(self._msg_label)
 
         bar = ttk.Frame(self)
         bar.pack(side="top", fill="x", pady=(8, 0))

@@ -49,6 +49,7 @@ from horiedit_py.data.game import (
     save_record_price,
     save_record_ship_class,
 )
+from horiedit_py.gui.layout import add_scroll_page
 from horiedit_py.data.ship import (
     cargo_recalc,
     load_fleet_entry,
@@ -72,11 +73,11 @@ class ShipTab(ttk.Frame):
         self._notebook = ttk.Notebook(self)
         self._notebook.pack(fill="both", expand=True)
 
-        self._fleet = _FleetEditor(self._notebook, state)
-        self._org = _OrgShipEditor(self._notebook, state)
-
-        self._notebook.add(self._fleet, text="나의 함대")
-        self._notebook.add(self._org, text="원래 함선 정보")
+        # 각 sub-tab 은 ScrollFrame 안에 — 창이 낮아 내용이 넘치면 잘리지 않고 스크롤된다
+        self._fleet, _ = add_scroll_page(
+            self._notebook, lambda p: _FleetEditor(p, state), "나의 함대")
+        self._org, _ = add_scroll_page(
+            self._notebook, lambda p: _OrgShipEditor(p, state), "원래 함선 정보")
 
         # 하위 sub-editor 의 dirty 를 외부로 전파
         self._fleet.add_dirty_listener(self._on_sub_dirty)
@@ -167,8 +168,10 @@ class _FleetEditor(ttk.Frame):
 
         # 좌: 함대 목록
         left = ttk.LabelFrame(self, text="함대", padding=6)
-        left.grid(row=1, column=0, sticky="nsw", padx=(0, 6))
-        self._listbox = tk.Listbox(left, height=18, exportselection=False, width=34)
+        left.grid(row=1, column=0, sticky="ns", padx=(0, 6))
+        left.rowconfigure(0, weight=1)
+        # height 는 최소 요청 높이 — 창이 커지면 목록이 세로로 늘어난다
+        self._listbox = tk.Listbox(left, height=8, exportselection=False, width=34)
         self._listbox.grid(row=0, column=0, sticky="nsew")
         sb = ttk.Scrollbar(left, orient="vertical", command=self._listbox.yview)
         sb.grid(row=0, column=1, sticky="ns")
@@ -177,7 +180,7 @@ class _FleetEditor(ttk.Frame):
 
         # 우: 편집 폼
         right = ttk.LabelFrame(self, text="함선 정보", padding=8)
-        right.grid(row=1, column=1, sticky="nsew")
+        right.grid(row=1, column=1, sticky="nw")
 
         r = 0
         self._sp_ccrew = self._add_spinbox(right, r, "현재 선원수", self._var_ccrew, 0, 65535); r += 1
@@ -227,7 +230,9 @@ class _FleetEditor(ttk.Frame):
         self._en_ship_name.grid(row=r, column=1, sticky="w", padx=4, pady=4)
         r += 1
 
-        self.columnconfigure(1, weight=1)
+        # 남는 폭은 오른쪽 빈 열이 가진다 (폼은 제 폭 유지), 남는 높이는 목록이 가진다
+        self.columnconfigure(2, weight=1)
+        self.rowconfigure(1, weight=1)
 
     def _add_spinbox(
         self, parent: tk.Misc, row: int, label: str, var: tk.IntVar, lo: int, hi: int,
@@ -644,8 +649,9 @@ class _OrgShipEditor(ttk.Frame):
 
         # 좌: 25종 목록
         left = ttk.LabelFrame(self, text="함선 종류 (25)", padding=6)
-        left.grid(row=1, column=0, sticky="nsw", padx=(0, 6))
-        self._listbox = tk.Listbox(left, height=18, exportselection=False, width=22)
+        left.grid(row=1, column=0, sticky="ns", padx=(0, 6))
+        left.rowconfigure(0, weight=1)
+        self._listbox = tk.Listbox(left, height=8, exportselection=False, width=22)
         self._listbox.grid(row=0, column=0, sticky="nsew")
         sb = ttk.Scrollbar(left, orient="vertical", command=self._listbox.yview)
         sb.grid(row=0, column=1, sticky="ns")
@@ -654,7 +660,7 @@ class _OrgShipEditor(ttk.Frame):
 
         # 우: 폼
         right = ttk.LabelFrame(self, text="원래 함선 정보", padding=8)
-        right.grid(row=1, column=1, sticky="nsew")
+        right.grid(row=1, column=1, sticky="nw")
 
         r = 0
         # 1) 배이름
@@ -709,7 +715,9 @@ class _OrgShipEditor(ttk.Frame):
             foreground="#888",
         ).grid(row=r, column=0, columnspan=2, sticky="w", padx=4); r += 1
 
-        self.columnconfigure(1, weight=1)
+        # 남는 폭은 오른쪽 빈 열이 가진다 (폼은 제 폭 유지), 남는 높이는 목록이 가진다
+        self.columnconfigure(2, weight=1)
+        self.rowconfigure(1, weight=1)
 
     def _add_price_spinbox(
         self,
