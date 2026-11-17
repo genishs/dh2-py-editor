@@ -49,6 +49,7 @@ from horiedit_py.data.game import (
     save_record_price,
     save_record_ship_class,
 )
+from horiedit_py.gui.layout import SplitPane
 from horiedit_py.data.ship import (
     cargo_recalc,
     load_fleet_entry,
@@ -72,9 +73,9 @@ class ShipTab(ttk.Frame):
         self._notebook = ttk.Notebook(self)
         self._notebook.pack(fill="both", expand=True)
 
+        # 각 sub-tab 은 SplitPane — 목록은 창 높이에 묶여 안에서 스크롤, 상세 폼은 자체 스크롤, 버튼 줄은 하단 고정
         self._fleet = _FleetEditor(self._notebook, state)
         self._org = _OrgShipEditor(self._notebook, state)
-
         self._notebook.add(self._fleet, text="나의 함대")
         self._notebook.add(self._org, text="원래 함선 정보")
 
@@ -121,11 +122,11 @@ class ShipTab(ttk.Frame):
 # ===========================================================================
 
 
-class _FleetEditor(ttk.Frame):
+class _FleetEditor(SplitPane):
     """현재 c_hero 가 보유한 함대(0..ship_num-1) 편집."""
 
     def __init__(self, master: tk.Misc, state: EditorState) -> None:
-        super().__init__(master, padding=8)
+        super().__init__(master, grow="right", footer=False, padding=8)
         self._state = state
         self._slot_loaded = False
         self._sel: Optional[int] = None
@@ -162,13 +163,15 @@ class _FleetEditor(ttk.Frame):
     # ---------------- 빌드 ----------------
 
     def _build(self) -> None:
-        self._hint = ttk.Label(self, text="(세이브 칸을 먼저 선택하세요)", foreground="#888")
-        self._hint.grid(row=0, column=0, columnspan=2, pady=8)
+        self._hint = ttk.Label(self.right, text="(세이브 칸을 먼저 선택하세요)", foreground="#888")
+        self._hint.grid(row=0, column=0, sticky="w", pady=8)
 
-        # 좌: 함대 목록
-        left = ttk.LabelFrame(self, text="함대", padding=6)
-        left.grid(row=1, column=0, sticky="nsw", padx=(0, 6))
-        self._listbox = tk.Listbox(left, height=18, exportselection=False, width=34)
+        # 좌: 함대 목록 (창 높이에 묶여 안에서 스크롤)
+        left = ttk.LabelFrame(self.left, text="함대", padding=6)
+        left.pack(fill="both", expand=True)
+        left.rowconfigure(0, weight=1)
+        # height 는 최소 요청 높이 — 창이 커지면 목록이 세로로 늘어난다
+        self._listbox = tk.Listbox(left, height=8, exportselection=False, width=34)
         self._listbox.grid(row=0, column=0, sticky="nsew")
         sb = ttk.Scrollbar(left, orient="vertical", command=self._listbox.yview)
         sb.grid(row=0, column=1, sticky="ns")
@@ -176,8 +179,8 @@ class _FleetEditor(ttk.Frame):
         self._listbox.bind("<<ListboxSelect>>", self._on_select)
 
         # 우: 편집 폼
-        right = ttk.LabelFrame(self, text="함선 정보", padding=8)
-        right.grid(row=1, column=1, sticky="nsew")
+        right = ttk.LabelFrame(self.right, text="함선 정보", padding=8)
+        right.grid(row=1, column=0, sticky="nw")
 
         r = 0
         self._sp_ccrew = self._add_spinbox(right, r, "현재 선원수", self._var_ccrew, 0, 65535); r += 1
@@ -227,7 +230,6 @@ class _FleetEditor(ttk.Frame):
         self._en_ship_name.grid(row=r, column=1, sticky="w", padx=4, pady=4)
         r += 1
 
-        self.columnconfigure(1, weight=1)
 
     def _add_spinbox(
         self, parent: tk.Misc, row: int, label: str, var: tk.IntVar, lo: int, hi: int,
@@ -347,9 +349,9 @@ class _FleetEditor(ttk.Frame):
     def _show_no_fleet_label(self) -> None:
         if not hasattr(self, "_no_fleet_lbl"):
             self._no_fleet_lbl = ttk.Label(
-                self, text="(보유 함선 없음)", foreground="#888"
+                self.right, text="(보유 함선 없음)", foreground="#888"
             )
-        self._no_fleet_lbl.grid(row=3, column=0, columnspan=2, pady=(8, 0))
+        self._no_fleet_lbl.grid(row=3, column=0, sticky="w", pady=(8, 0))
 
     def _hide_no_fleet_label(self) -> None:
         if hasattr(self, "_no_fleet_lbl"):
@@ -584,7 +586,7 @@ class _FleetEditor(ttk.Frame):
 # ===========================================================================
 
 
-class _OrgShipEditor(ttk.Frame):
+class _OrgShipEditor(SplitPane):
     """슬롯 내 25종 함선 템플릿 편집.
 
     편집 대상:
@@ -600,7 +602,7 @@ class _OrgShipEditor(ttk.Frame):
     """
 
     def __init__(self, master: tk.Misc, state: EditorState) -> None:
-        super().__init__(master, padding=8)
+        super().__init__(master, grow="right", footer=True, padding=8)
         self._state = state
         self._slot_loaded = False
         self._sel: Optional[int] = None
@@ -639,13 +641,14 @@ class _OrgShipEditor(ttk.Frame):
     # ---------------- 빌드 ----------------
 
     def _build(self) -> None:
-        self._hint = ttk.Label(self, text="(세이브 칸을 먼저 선택하세요)", foreground="#888")
-        self._hint.grid(row=0, column=0, columnspan=2, pady=8)
+        self._hint = ttk.Label(self.right, text="(세이브 칸을 먼저 선택하세요)", foreground="#888")
+        self._hint.grid(row=0, column=0, sticky="w", pady=8)
 
-        # 좌: 25종 목록
-        left = ttk.LabelFrame(self, text="함선 종류 (25)", padding=6)
-        left.grid(row=1, column=0, sticky="nsw", padx=(0, 6))
-        self._listbox = tk.Listbox(left, height=18, exportselection=False, width=22)
+        # 좌: 25종 목록 (창 높이에 묶여 안에서 스크롤)
+        left = ttk.LabelFrame(self.left, text="함선 종류 (25)", padding=6)
+        left.pack(fill="both", expand=True)
+        left.rowconfigure(0, weight=1)
+        self._listbox = tk.Listbox(left, height=8, exportselection=False, width=22)
         self._listbox.grid(row=0, column=0, sticky="nsew")
         sb = ttk.Scrollbar(left, orient="vertical", command=self._listbox.yview)
         sb.grid(row=0, column=1, sticky="ns")
@@ -653,8 +656,8 @@ class _OrgShipEditor(ttk.Frame):
         self._listbox.bind("<<ListboxSelect>>", self._on_select)
 
         # 우: 폼
-        right = ttk.LabelFrame(self, text="원래 함선 정보", padding=8)
-        right.grid(row=1, column=1, sticky="nsew")
+        right = ttk.LabelFrame(self.right, text="원래 함선 정보", padding=8)
+        right.grid(row=1, column=0, sticky="nw")
 
         r = 0
         # 1) 배이름
@@ -696,20 +699,18 @@ class _OrgShipEditor(ttk.Frame):
         ); r += 1
 
         # 기본값으로 초기화 — 게임 본체 파일(MAIN.EXE)의 원본 함선 값으로 복원
+        # (스크롤 밖 하단 고정 푸터)
         self._btn_reset_default = ttk.Button(
-            right, text="이 배를 기본값으로 초기화",
+            self.footer, text="이 배를 기본값으로 초기화",
             command=self._on_reset_to_default,
         )
-        self._btn_reset_default.grid(
-            row=r, column=0, columnspan=2, sticky="w", padx=4, pady=(10, 2),
-        ); r += 1
+        self._btn_reset_default.pack(side="left", padx=4)
         ttk.Label(
-            right,
+            self.footer,
             text="* 게임 본체 파일(MAIN.EXE)에 저장된 이 함선의 원래 값으로 되돌립니다.",
             foreground="#888",
-        ).grid(row=r, column=0, columnspan=2, sticky="w", padx=4); r += 1
+        ).pack(side="left", padx=4)
 
-        self.columnconfigure(1, weight=1)
 
     def _add_price_spinbox(
         self,

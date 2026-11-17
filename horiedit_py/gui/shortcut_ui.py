@@ -12,6 +12,7 @@ from tkinter import messagebox, ttk
 from typing import Optional
 
 from horiedit_py import shortcut
+from horiedit_py.gui.layout import place_dialog
 
 _SOURCE_RUN_MSG = (
     "지금은 소스(python)로 실행 중이라 바로가기를 만들 수 없습니다.\n"
@@ -24,7 +25,7 @@ def _ask_create_dialog(parent: tk.Misc, update: bool) -> tuple[bool, bool]:
     win = tk.Toplevel(parent)
     win.title("바탕화면 바로가기")
     win.transient(parent)
-    win.resizable(False, False)
+    win.resizable(True, True)
 
     answer = {"yes": False}
     never = tk.BooleanVar(value=False)
@@ -55,14 +56,7 @@ def _ask_create_dialog(parent: tk.Misc, update: bool) -> tuple[bool, bool]:
     win.bind("<Return>", lambda e: _yes())
     win.bind("<Escape>", lambda e: win.destroy())
 
-    win.update_idletasks()
-    try:
-        px, py = parent.winfo_rootx(), parent.winfo_rooty()
-        pw, ph = parent.winfo_width(), parent.winfo_height()
-        w, h = win.winfo_width(), win.winfo_height()
-        win.geometry(f"+{px + (pw - w) // 2}+{py + max(0, (ph - h) // 3)}")
-    except tk.TclError:
-        pass
+    place_dialog(win, parent, min_size=(320, 180), vfrac=1 / 3)
     win.grab_set()
     parent.wait_window(win)
     return answer["yes"], bool(never.get())

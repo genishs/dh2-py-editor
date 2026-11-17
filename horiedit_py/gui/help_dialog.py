@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import tkinter as tk
 import webbrowser
+from tkinter import font as tkfont
 from tkinter import ttk
 
 from horiedit_py import __version__
+from horiedit_py.gui.layout import place_dialog
 
 
 GITHUB_URL = "https://github.com/genishs/dh2-py-editor"
@@ -116,6 +118,10 @@ _GETTING_STARTED_TEXT = """\
    무관하게 그 폴더의 모든 세이브와 새 게임에
    똑같이 적용됩니다.)
 
+▶ 값은 화살표나 키보드로 바꾸세요
+   마우스 휠은 숫자·선택 칸의 값을 바꾸지 않습니다
+   (휠은 화면만 스크롤합니다).
+
 ▶ 게임을 켠 채로 편집하지 마세요
    게임(DOSBox 등)을 완전히 종료한 뒤 편집하고,
    편집이 끝난 뒤 게임을 실행하세요.
@@ -155,13 +161,27 @@ _FEATURES_TEXT = """\
 ▶ 항구
   · 130 개 항구
   · 항구 정보 (등장 공업치, 인구, 발전도 등)
-  · 항구 경제 데이터 (상업치 / 공업치)
+  · 상업치 · 공업치 (sub-tab)
+  · 공급 수치 (효과 불확실, 시험) (sub-tab) — 세이브 칸 데이터라 [저장] 으로 반영
 
-▶ 게임 설정 (함선 기본 데이터)
-  · 함선 기본 성능: 회전력 / 돛 / 승무원 / 적재량 / 무기수 등
-  · 함선 이름·모양
-  · 항구 공급 수치 (효과 불확실, 시험)
-  · 운하 (개통 / 원상복원, 시험): 수에즈·파나마 운하를 열거나 닫습니다
+
+[ 게임 전체 — 모든 세이브에 공통 적용 — [게임 전체] 탭 ]
+  (세이브 칸과 무관. 이 게임 폴더의 모든 세이브와 새 게임에 적용됩니다.
+   [도구] 메뉴의 항목은 이 탭의 해당 sub-tab 으로 바로 이동합니다.)
+
+▶ 함선 기본 성능 (게임 본체 파일 MAIN.EXE, [저장] 으로 반영, 시험 기능)
+  · 회전력 / 돛 / 승무원 / 적재량 / 무기수 등
+
+▶ 함선 이름·모양 (게임 본체 파일 MAIN.EXE, [저장] 으로 반영, 시험 기능)
+
+▶ 신조 내구도 상한 (게임 본체 파일 MAIN.EXE, 버튼을 누르면 바로 반영)
+  · 조선소에서 새 배를 만들 때의 내구도 상한(기본 100)을 1~255 로 변경
+  · 게임 본체 파일에서 해당 부분을 자동으로 찾아 바꿉니다
+  · 처음 적용할 때 원본 백업(MAIN.EXE.beforeHullCap)을 자동으로 만들고,
+    [백업에서 복원] 으로 되돌립니다
+
+▶ 운하 (개통 / 원상복원) — 지도 파일 WORLDMAP.LZW, 버튼을 누르면 바로 반영
+    수에즈·파나마 운하를 열거나 닫습니다
       - 게임 폴더의 지도 파일(WORLDMAP.LZW)을 바꿉니다. 운하마다 따로 바꿉니다
       - 게임(DOSBox)을 완전히 종료한 뒤 바꾸세요
       - 첫 변경 때 원본 백업(WORLDMAP.LZW.canal-orig)이 자동으로 만들어집니다
@@ -171,15 +191,6 @@ _FEATURES_TEXT = """\
         모든 세이브와 새 게임에 똑같이 적용됩니다
       - 닫을 때(원상복원): 운하 안에서 저장한 세이브는 닫은 뒤 불러오면 함대가
         육지 위에 놓여 갇힐 수 있으니, 운하를 완전히 빠져나온 곳에서 저장한 뒤 닫으세요
-
-
-[ 게임 전체 설정 — 도구 메뉴 ]
-
-▶ 최대 내구도 상한 바꾸기
-  · 조선소에서 새 배를 만들 때의 내구도 상한(기본 100)을 1~255 로 변경
-  · 게임 본체 파일에서 해당 부분을 자동으로 찾아 바꿉니다
-  · 세이브 칸과 무관 — 게임 전체에 적용
-  · 처음 적용할 때 원본 백업(MAIN.EXE.beforeHullCap)을 자동으로 만듭니다
 """
 
 
@@ -189,13 +200,15 @@ _WARNINGS_TEXT = """\
 ▶ 백업 필수
   - 편집 전 저장 파일(KOUKAI2.DAT)과 게임 본체 파일(MAIN.EXE)을 반드시 복사해 두세요.
   - 일부 편집은 게임 동작에 부작용을 일으킬 수 있습니다 (특히 분석이 덜 된 영역).
-  - 최대 내구도 상한 바꾸기 기능은 처음 적용할 때 .beforeHullCap 백업을 자동으로 만듭니다.
+  - 신조 내구도 상한은 처음 적용할 때 .beforeHullCap 백업을 자동으로 만듭니다.
+  - 운하 개통 / 원상복원은 게임을 끄고 하세요. 지도 파일(WORLDMAP.LZW) 복사를 권합니다
+    (첫 변경 때 .canal-orig 백업 자동 생성).
 
 ▶ 시험 기능 (효과 불확실)
-  - 항구 공급 수치 (게임 설정 → 항구 공급 수치) — 바꿔도 게임 내 가격에
+  - 항구 공급 수치 (항구 탭 → 공급 수치) — 바꿔도 게임 내 가격에
     바로 영향이 나타나지 않았습니다 (평균물가는 매월 1일에만 갱신).
-  - 운하 개통 / 원상복원 (게임 설정 → 운하) — 게임 실측 확인 전의 시험 기능입니다.
-    바꾸기 전 게임을 끄고, 지도 파일(WORLDMAP.LZW) 복사를 권합니다 (첫 변경 때 .canal-orig 백업 자동 생성).
+  - 함선 기본 성능 / 함선 이름·모양 (게임 전체 탭) — 게임 본체 파일(MAIN.EXE)을 직접 바꾸는
+    분석이 덜 된 영역입니다.
   - 용도가 분명하지 않은 값의 임의 변경 — 자세한 분석 자료는 GitHub 를 참고하세요.
 
 ▶ 충돌 가능성
@@ -208,8 +221,8 @@ _WARNINGS_TEXT = """\
   - 한 가지라도 누락되면 게임 인물 목록에 표시되지 않으므로,
     직접 숫자 입력보다 [소속 변경] 목록 사용을 권합니다.
 
-▶ 게임 본체 파일 수정 (도구 메뉴)
-  - 게임 버전이 다르면 해당 부분을 찾지 못할 수 있고, 다이얼로그가 "찾지 못함" 을 표시합니다.
+▶ 게임 본체 파일 수정 (게임 전체 탭 — [도구] 메뉴에서 바로 이동)
+  - 게임 버전이 다르면 해당 부분을 찾지 못할 수 있고, 해당 화면이 "찾지 못함" 을 표시합니다.
   - 찾더라도 다른 버전에서는 의미가 다를 수 있습니다.
   - [백업에서 복원] 으로 언제든 되돌릴 수 있도록 설계되었습니다.
 
@@ -250,7 +263,7 @@ _WHATS_NEW_TEXT = """\
      바로가기를 만들까요?」 라고 묻고, 만들면 다음부터
      터미널 없이 아이콘만 누르면 그 세이브로 바로
      열립니다. (지울 때는 [도움말] ▸ [바로가기 제거])
-   · 운하 개통 / 원상복원 (시험 기능) — [게임 설정] 탭의
+   · 운하 개통 / 원상복원 — [게임 전체] 탭의
      [운하] 에서 수에즈·파나마 운하를 열고 닫습니다.
      게임을 끈 상태에서 쓰세요. 원본은 자동 백업됩니다.
    · [도움말] ▸ [처음 사용 안내] — 설치부터
@@ -261,10 +274,12 @@ _WHATS_NEW_TEXT = """\
 ──────────────────────────────────────────
 1. 창 맨 위에 메뉴가 생겼어요
    [파일] [도구] [도움말] 에서 전체 기능을
-   한눈에 찾을 수 있습니다.
+   한눈에 찾을 수 있습니다. [도구] 의 항목은
+   [게임 전체] 탭의 해당 화면으로 바로 이동합니다.
 
-2. 최대 내구도 상한 바꾸기
-   [도구] ▸ [최대 내구도 상한 바꾸기...] 에서
+2. 신조 내구도 상한
+   [게임 전체] 탭의 [신조 내구도 상한] ([도구] ▸
+   [신조 내구도 상한...] 으로 바로 이동)에서
    조선소에서 새로 만드는 배의 내구도 상한
    (기본 100)을 1~255 로 바꿀 수 있어요.
    · 게임 전체에 적용되며 세이브 칸과 무관합니다.
@@ -319,8 +334,30 @@ def _show_scrolling_text(
     outer = ttk.Frame(win, padding=10)
     outer.pack(fill="both", expand=True)
 
+    check_var = tk.BooleanVar(value=checkbox_initial)
+
+    def _do_close() -> None:
+        if on_close is not None:
+            try:
+                on_close(bool(check_var.get()))
+            except Exception:
+                pass
+        win.destroy()
+
+    # 버튼 줄을 아래쪽에 먼저 확보하고 본문(text_frame)이 남는 공간을 가진다 — 작은 창에서도 [닫기] 가 안 잘린다
+    btns = ttk.Frame(outer)
+    btns.pack(side="bottom", fill="x", pady=(8, 0))
+    if checkbox_label is not None:
+        ttk.Checkbutton(
+            btns, text=checkbox_label, variable=check_var,
+        ).pack(side="left", padx=4)
+    if extra_button is not None:
+        label, cmd = extra_button
+        ttk.Button(btns, text=label, command=cmd).pack(side="left", padx=4)
+    ttk.Button(btns, text="닫기", command=_do_close).pack(side="right", padx=4)
+
     text_frame = ttk.Frame(outer)
-    text_frame.pack(fill="both", expand=True)
+    text_frame.pack(side="top", fill="both", expand=True)
     txt = tk.Text(
         text_frame, width=width, height=height, wrap="word",
         font=("Malgun Gothic", 10),
@@ -332,43 +369,29 @@ def _show_scrolling_text(
     txt.pack(side="left", fill="both", expand=True)
     sb.pack(side="right", fill="y")
 
-    check_var = tk.BooleanVar(value=checkbox_initial)
-
-    def _do_close() -> None:
-        if on_close is not None:
-            try:
-                on_close(bool(check_var.get()))
-            except Exception:
-                pass
-        win.destroy()
-
-    btns = ttk.Frame(outer)
-    btns.pack(fill="x", pady=(8, 0))
-    if checkbox_label is not None:
-        ttk.Checkbutton(
-            btns, text=checkbox_label, variable=check_var,
-        ).pack(side="left", padx=4)
-    if extra_button is not None:
-        label, cmd = extra_button
-        ttk.Button(btns, text=label, command=cmd).pack(side="left", padx=4)
-    ttk.Button(btns, text="닫기", command=_do_close).pack(side="right", padx=4)
+    # 본문이 다 보이는 높이로 연다 (화면을 넘으면 화면에 맞추고 나머지는 스크롤).
+    # 줄 수는 글꼴 폭으로 직접 어림한다 (창이 뜨기 전이라 Text 의 줄 계산을 쓸 수 없다).
+    try:
+        fnt = tkfont.Font(font=txt.cget("font"))
+        line_px = max(1, fnt.metrics("linespace"))
+        text_w = max(1, width * fnt.measure("0"))
+        lines = sum(max(1, -(-fnt.measure(ln) // text_w)) for ln in body.splitlines())
+        # 화면 높이의 약 70% 를 넘지 않게 (제목 줄·버튼 줄·여백 약 130px 제외) — 나머지는 스크롤
+        max_lines = max(8, int(txt.winfo_screenheight() * 0.7 - 130) // line_px)
+        txt.configure(height=min(max(lines + 2, 6), max_lines))
+    except (tk.TclError, ValueError):
+        pass
 
     win.protocol("WM_DELETE_WINDOW", _do_close)
     win.grab_set()
     win.focus_set()
 
-    # 부모 중앙 정렬
-    win.update_idletasks()
-    try:
-        px = parent.winfo_rootx()
-        py = parent.winfo_rooty()
-        pw = parent.winfo_width()
-        ph = parent.winfo_height()
-        w = win.winfo_width()
-        h = win.winfo_height()
-        win.geometry(f"+{px + (pw - w) // 2}+{py + max(0, (ph - h) // 4)}")
-    except tk.TclError:
-        pass
+    # 부모 중앙 정렬 + 화면 밖으로 안 넘기고, 이후엔 창 크기가 본문 크기를 정한다 (줄이면 본문이 스크롤)
+    place_dialog(win, parent, min_size=(360, 240), vfrac=0.25)
+    txt.configure(width=20, height=4)
+    # 버튼 줄(체크박스·추가 버튼·닫기)이 잘리지 않는 폭 아래로는 못 줄이게
+    mw, mh = win.minsize()
+    win.minsize(max(mw, btns.winfo_reqwidth() + 28), mh)
 
 
 # ---------------------------------------------------------------------------
@@ -377,7 +400,7 @@ def _show_scrolling_text(
 
 def show_getting_started(parent: tk.Misc) -> None:
     _show_scrolling_text(
-        parent, "처음 사용 안내", _GETTING_STARTED_TEXT, height=30,
+        parent, "처음 사용 안내", _GETTING_STARTED_TEXT, width=92, height=30,
         extra_button=("GitHub 열기", lambda: webbrowser.open(GITHUB_URL)),
     )
 

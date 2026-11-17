@@ -4,7 +4,9 @@
 우측: 선택된 항구의 폼 (commerce, industry Spinbox).
 
 dirty/commit/revert/reload 인터페이스는 PersonTab 과 동일 패턴.
-물가(가설 +14..+23) 는 별도 확정 단계에서 추가 예정.
+
+[항구] 탭은 sub-tab 두 개 — 「상업치 · 공업치」 와 「공급 수치 (효과 불확실)」.
+둘 다 세이브 칸 데이터라서 메인 [저장] / [초기화] 로 함께 묶인다.
 """
 from __future__ import annotations
 
@@ -19,17 +21,19 @@ from horiedit_py.data.port import (
     load_port_econ,
     save_port_econ,
 )
+from horiedit_py.gui.layout import SplitPane
+from horiedit_py.gui.port_supply_panel import PortSupplyPanel
 
 
 def _in_range(v: int, lo: int, hi: int) -> bool:
     return lo <= v <= hi
 
 
-class PortTab(ttk.Frame):
-    """항구 상업치/공업치 편집 탭."""
+class _PortEconPanel(SplitPane):
+    """항구 상업치/공업치 편집 패널 ([항구] 탭의 첫 sub-tab)."""
 
     def __init__(self, master: tk.Misc, state: EditorState) -> None:
-        super().__init__(master, padding=8)
+        super().__init__(master, grow="left", footer=False, padding=8)
         self._state = state
         self._slot_loaded = False
         self._port_idx: Optional[int] = None
@@ -48,21 +52,17 @@ class PortTab(ttk.Frame):
     # ---------------- UI ----------------
 
     def _build(self) -> None:
-        self.columnconfigure(0, weight=2)
-        self.columnconfigure(1, weight=1)
-        self.rowconfigure(0, weight=1)
-
+        # 목록(왼쪽, 창 높이에 묶여 안에서 스크롤) | 폼(오른쪽, 자체 스크롤) — SplitPane
         self._build_left()
         self._build_right()
 
         self._hint = ttk.Label(
-            self, text="(세이브 칸을 먼저 선택하세요)", foreground="#888",
+            self.right, text="(세이브 칸을 먼저 선택하세요)", foreground="#888",
         )
-        self._hint.grid(row=1, column=0, columnspan=2, pady=(8, 0))
+        self._hint.grid(row=1, column=0, pady=(8, 0))
 
     def _build_left(self) -> None:
-        left = ttk.Frame(self)
-        left.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        left = self.left
         left.rowconfigure(1, weight=1)
         left.columnconfigure(0, weight=1)
 
@@ -76,16 +76,16 @@ class PortTab(ttk.Frame):
 
         cols = ("idx", "name", "commerce", "industry")
         self._tv = ttk.Treeview(
-            tv_frame, columns=cols, show="headings", height=22, selectmode="browse",
+            tv_frame, columns=cols, show="headings", height=8, selectmode="browse",
         )
         self._tv.heading("idx", text="번호")
         self._tv.heading("name", text="항구")
         self._tv.heading("commerce", text="상업치")
         self._tv.heading("industry", text="공업치")
-        self._tv.column("idx", width=50, anchor="center", stretch=False)
-        self._tv.column("name", width=160, anchor="w")
-        self._tv.column("commerce", width=80, anchor="e")
-        self._tv.column("industry", width=80, anchor="e")
+        self._tv.column("idx", width=50, minwidth=40, anchor="center", stretch=False)
+        self._tv.column("name", width=160, minwidth=80, anchor="w")
+        self._tv.column("commerce", width=80, minwidth=50, anchor="e")
+        self._tv.column("industry", width=80, minwidth=50, anchor="e")
         self._tv.grid(row=0, column=0, sticky="nsew")
 
         sb = ttk.Scrollbar(tv_frame, orient="vertical", command=self._tv.yview)
@@ -95,8 +95,9 @@ class PortTab(ttk.Frame):
         self._tv.bind("<<TreeviewSelect>>", self._on_tv_select)
 
     def _build_right(self) -> None:
-        right = ttk.Frame(self)
-        right.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+        right = ttk.Frame(self.right)
+        self.right.columnconfigure(0, weight=1)
+        right.grid(row=0, column=0, sticky="new", padx=(6, 0))
         right.columnconfigure(0, weight=1)
 
         self._lbl_current = ttk.Label(
@@ -303,3 +304,46 @@ class PortTab(ttk.Frame):
                 w.configure(state=st)
             except tk.TclError:
                 pass
+
+
+class PortTab(ttk.Frame):
+    """[항구] 탭 — 상업치·공업치 + 공급 수치 두 sub-tab 을 하나의 탭 인터페이스(dirty/commit/reload)로 묶는다."""
+
+    def __init__(self, master: tk.Misc, state: EditorState) -> None:
+        super().__init__(master)
+        self._nb = ttk.Notebook(self)
+        self._nb.pack(fill="both", expand=True)
+        self._econ = _PortEconPanel(self._nb, state)
+        self._nb.add(self._econ, text="상업치 · 공업치")
+        self._supply = PortSupplyPanel(self._nb, state)
+        self._nb.add(self._supply, text="공급 수치 (효과 불확실)")
+        self._supply_page = self._supply
+        # 슬롯 선택 전에는 공급 수치 패널도 잠근다 (예전 게임 설정 탭에서와 같은 동작)
+        self._supply.set_enabled(False)
+
+    def select_supply(self) -> None:
+        self._nb.select(self._supply_page)
+
+    # ---- 탭 인터페이스: 두 패널에 위임 ----
+
+    def is_dirty(self) -> bool:
+        return self._econ.is_dirty() or self._supply.is_dirty()
+
+    def add_dirty_listener(self, callback: Callable[[], None]) -> None:
+        self._econ.add_dirty_listener(callback)
+        self._supply.add_dirty_listener(callback)
+
+    def reload(self) -> None:
+        self._econ.reload()
+        self._supply.set_enabled(True)   # 슬롯에서 다시 읽고 dirty=False
+
+    def reset(self) -> None:
+        self._econ.reset()
+        self._supply.set_enabled(False)
+
+    def revert(self) -> None:
+        self.reload()
+
+    def commit(self) -> None:
+        self._econ.commit()
+        self._supply.commit()
