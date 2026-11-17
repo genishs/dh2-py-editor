@@ -32,7 +32,7 @@ class HullCapPanel(Page):
     """신조 내구도 상한 패널 (게임 전체 탭의 sub-tab)."""
 
     def __init__(self, master: tk.Misc, state: EditorState) -> None:
-        super().__init__(master, footer=True, max_body_width=980, padding=14)
+        super().__init__(master, footer=True, compact=True, max_body_width=980, padding=14)
         self._state = state
         self._main_exe: Optional[Path] = None
         self._disk_caps: list[tuple[int, int]] = []

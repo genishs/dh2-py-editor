@@ -17,7 +17,7 @@ from tkinter import messagebox, ttk
 from typing import Callable, Optional
 
 from horiedit_py.common import EditorState, Person, decode_kr, encode_kr_fixed
-from horiedit_py.gui.layout import SplitPane, track_wraplength
+from horiedit_py.gui.layout import AutoScrollbar, SplitPane, track_wraplength
 from horiedit_py.data.person import (
     HERO_CATALOG_ID,
     HERO_CATALOG_TO_IDX,
@@ -217,8 +217,8 @@ class PersonTab(SplitPane):
 
         sb = ttk.Scrollbar(tv_frame, orient="vertical", command=self._tv.yview)
         sb.grid(row=0, column=1, sticky="ns")
-        # 좁은 창에서 열이 잘리지 않게 가로 스크롤바 (넓으면 안 쓰인다)
-        sbx = ttk.Scrollbar(tv_frame, orient="horizontal", command=self._tv.xview)
+        # 좁은 창에서 열이 잘리지 않게 가로 스크롤바 — 다 보이면 스스로 숨는다
+        sbx = AutoScrollbar(tv_frame, orient="horizontal", command=self._tv.xview)
         sbx.grid(row=1, column=0, sticky="ew")
         self._tv.configure(yscrollcommand=sb.set, xscrollcommand=sbx.set)
 

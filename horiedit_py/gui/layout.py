@@ -32,6 +32,9 @@ _WHEEL_VALUE = ("TCombobox", "TSpinbox")
 
 _installed_on: "set[int]" = set()
 
+#: 스크롤 영역 맨 아래 여백(px)
+_BOTTOM_PAD = 10
+
 
 # ---------------------------------------------------------------------------
 # 스크롤 컨테이너
@@ -62,11 +65,15 @@ class ScrollFrame(ttk.Frame):
         max_body_width: Optional[int] = None,
         align: str = "nw",
         request_width: bool = False,
+        request_height: bool = False,
         **kw: object,
     ) -> None:
         super().__init__(master, **kw)
         self._max_w = max_body_width
         self._req_width = request_width
+        self._req_height = request_height
+        #: 다시 배치한 뒤 불리는 콜백 (Page 의 compact 판단용)
+        self.on_layout: Optional[Callable[[], None]] = None
         self._center = align in ("n", "center")
         self._last_req = (-1, -1)
         self._bars = (False, False)
@@ -144,6 +151,8 @@ class ScrollFrame(ttk.Frame):
                 want = rw + vb
                 if int(self._canvas.cget("width")) != want:
                     self._canvas.configure(width=want)
+            if self._req_height and int(self._canvas.cget("height")) != rh:
+                self._canvas.configure(height=rh)
             if ow <= 1 or oh <= 1:
                 return
             need_v = rh > oh
@@ -175,12 +184,16 @@ class ScrollFrame(ttk.Frame):
             x = max(0, (cw - bw) // 2) if self._center else 0
             self._canvas.coords(self._win, x, 0)
             self._canvas.itemconfigure(self._win, width=bw, height=bh)
-            self._canvas.configure(scrollregion=(0, 0, max(bw + x, cw), bh))
+            # 끝까지 스크롤했을 때 마지막 줄이 하단 푸터에 붙지 않도록 아래 여백을 조금 더 준다
+            self._canvas.configure(
+                scrollregion=(0, 0, max(bw + x, cw), bh + (_BOTTOM_PAD if need_v else 0)))
             if not need_v:
                 self._canvas.yview_moveto(0)
             if not need_h:
                 self._canvas.xview_moveto(0)
             self._last_layout = (cw, ch, need_v, need_h)
+            if self.on_layout is not None:
+                self.on_layout()
         except tk.TclError:
             pass
 
@@ -223,6 +236,20 @@ class ScrollFrame(ttk.Frame):
             pass
 
 
+class AutoScrollbar(ttk.Scrollbar):
+    """내용이 다 보이면(0.0~1.0) 스스로 숨는 스크롤바 — grid 로 놓은 곳에서만 쓴다 (ScrollFrame 과 같은 자동 숨김)."""
+
+    def set(self, lo: object, hi: object) -> None:  # type: ignore[override]
+        try:
+            if float(lo) <= 0.0 and float(hi) >= 1.0:
+                self.grid_remove()
+            else:
+                self.grid()
+        except (tk.TclError, ValueError):
+            pass
+        super().set(lo, hi)
+
+
 def _make_footer(parent: tk.Misc, row: int, columnspan: int = 1) -> ttk.Frame:
     """스크롤 영역 밖 하단 고정 버튼 줄 — 위에 구분선. 반환: 버튼들을 넣을 프레임."""
     box = ttk.Frame(parent)
@@ -230,6 +257,7 @@ def _make_footer(parent: tk.Misc, row: int, columnspan: int = 1) -> ttk.Frame:
     ttk.Separator(box, orient="horizontal").pack(side="top", fill="x", pady=(4, 0))
     bar = ttk.Frame(box)
     bar.pack(side="top", fill="x", pady=(6, 0))
+    bar.box = box  # type: ignore[attr-defined]
     return bar
 
 
@@ -237,19 +265,41 @@ class Page(ttk.Frame):
     """한 줄기 화면: 위는 ScrollFrame(``body``), 아래는 스크롤 밖 고정 푸터(``footer``).
 
     패널 클래스가 이 클래스를 상속해 ``self.body`` 에 폼을, ``self.footer`` 에 실행 버튼 줄을 넣는다.
+
+    ``compact=True`` : 내용이 창에 다 들어가면 푸터가 창 맨 아래가 아니라 내용 바로 아래에 붙는다 (짧은 화면에서
+    입력칸과 버튼 사이가 휑하게 비지 않게). 내용이 넘치면 보통처럼 푸터가 하단에 고정되고 내용만 스크롤된다.
     """
 
     def __init__(
-        self, master: tk.Misc, *, footer: bool = True,
+        self, master: tk.Misc, *, footer: bool = True, compact: bool = False,
         max_body_width: Optional[int] = None, align: str = "nw", **kw: object,
     ) -> None:
         super().__init__(master, **kw)
-        self.rowconfigure(0, weight=1)
+        self._compact = compact and footer
         self.columnconfigure(0, weight=1)
-        self.scroll = ScrollFrame(self, max_body_width=max_body_width, align=align)
+        self.scroll = ScrollFrame(
+            self, max_body_width=max_body_width, align=align, request_height=self._compact,
+        )
         self.scroll.grid(row=0, column=0, sticky="nsew")
         self.body = self.scroll.body
         self.footer: Optional[ttk.Frame] = _make_footer(self, 1) if footer else None
+        if self._compact:
+            self.rowconfigure(0, weight=0)
+            self.rowconfigure(2, weight=1)   # 남는 높이는 푸터 아래 빈칸이 가진다
+            self.scroll.on_layout = self._balance
+            self.bind("<Configure>", self._balance, add="+")
+        else:
+            self.rowconfigure(0, weight=1)
+
+    def _balance(self, _e: object = None) -> None:
+        """내용이 들어가면 (내용 | 푸터 | 빈칸), 아니면 (스크롤 내용 | 푸터)."""
+        try:
+            need = self.scroll.body.winfo_reqheight() + self.footer.box.winfo_reqheight()  # type: ignore[union-attr]
+            fits = need + 36 <= self.winfo_height()
+            self.rowconfigure(0, weight=0 if fits else 1)
+            self.rowconfigure(2, weight=1 if fits else 0)
+        except tk.TclError:
+            pass
 
 
 class SplitPane(ttk.Frame):

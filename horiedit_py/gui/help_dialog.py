@@ -376,7 +376,8 @@ def _show_scrolling_text(
         line_px = max(1, fnt.metrics("linespace"))
         text_w = max(1, width * fnt.measure("0"))
         lines = sum(max(1, -(-fnt.measure(ln) // text_w)) for ln in body.splitlines())
-        max_lines = max(8, (txt.winfo_screenheight() - 260) // line_px)
+        # 화면 높이의 약 70% 를 넘지 않게 (제목 줄·버튼 줄·여백 약 130px 제외) — 나머지는 스크롤
+        max_lines = max(8, int(txt.winfo_screenheight() * 0.7 - 130) // line_px)
         txt.configure(height=min(max(lines + 2, 6), max_lines))
     except (tk.TclError, ValueError):
         pass
@@ -399,7 +400,7 @@ def _show_scrolling_text(
 
 def show_getting_started(parent: tk.Misc) -> None:
     _show_scrolling_text(
-        parent, "처음 사용 안내", _GETTING_STARTED_TEXT, height=30,
+        parent, "처음 사용 안내", _GETTING_STARTED_TEXT, width=92, height=30,
         extra_button=("GitHub 열기", lambda: webbrowser.open(GITHUB_URL)),
     )
 
